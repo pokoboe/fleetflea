@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GreenFleet IQ</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:        #0a0f0d;
+      --surface:   #111a14;
+      --card:      #162019;
+      --border:    #1e3022;
+      --green:     #00e87a;
+      --green-dim: #00b85f;
+      --amber:     #f5a623;
+      --red:       #ff4757;
+      --blue:      #4ecdc4;
+      --text:      #e8f5ee;
+      --muted:     #6b8a72;
+      --font:      'Space Grotesk', sans-serif;
+      --mono:      'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 28px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      width: 34px; height: 34px;
+      background: var(--green);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .logo-text {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .logo-text span { color: var(--green); }
+    .header-meta {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+    .live-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      background: var(--green);
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      padding: 16px 28px 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      border-radius: 8px 8px 0 0;
+      transition: all .2s;
+      border: 1px solid transparent;
+      border-bottom: none;
+      background: transparent;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      color: var(--green);
+      background: var(--bg);
+      border-color: var(--border);
+    }
+    .tab-icon { margin-right: 6px; }
+
+    /* ── Main ── */
+    .main { padding: 28px; }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* ── KPI Row ── */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .kpi {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+    .kpi:hover { border-color: var(--green-dim); }
+    .kpi::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--green), transparent);
+    }
+    .kpi-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 700;
+      font-family: var(--mono);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .kpi-value.green { color: var(--green); }
+    .kpi-value.amber { color: var(--amber); }
+    .kpi-value.red   { color: var(--red); }
+    .kpi-value.blue  { color: var(--blue); }
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title span { color: var(--green); }
+
+    /* ── Grid 2 ── */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* ── Chart container ── */
+    .chart-wrap { position: relative; height: 240px; }
+    .chart-wrap-tall { position: relative; height: 300px; }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #0d1a10;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    tr:hover td { background: rgba(0,232,122,.04); }
+    tr:last-child td { border-bottom: none; }
+
+    /* ── EV Score bar ── */
+    .ev-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ev-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .ev-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width .6s ease;
+    }
+    .ev-score-num {
+      font-size: 12px;
+      font-weight: 700;
+      font-family: var(--mono);
+      min-width: 36px;
+      text-align: right;
+    }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-green  { background: rgba(0,232,122,.15); color: var(--green); }
+    .badge-amber  { background: rgba(245,166,35,.15); color: var(--amber); }
+    .badge-red    { background: rgba(255,71,87,.15);  color: var(--red); }
+    .badge-blue   { background: rgba(78,205,196,.15); color: var(--blue); }
+
+    /* ── AI Insights ── */
+    .ace-input-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .ace-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .ace-input:focus { border-color: var(--green-dim); }
+    .ace-input::placeholder { color: var(--muted); }
+    .btn {
+      padding: 12px 24px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 600;
+      transition: all .2s;
+    }
+    .btn-green {
+      background: var(--green);
+      color: #0a0f0d;
+    }
+    .btn-green:hover { background: #00ff88; transform: translateY(-1px); }
+    .btn-green:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; transform: none; }
+
+    .ace-response {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      min-height: 120px;
+    }
+    .ace-thinking {
+      color: var(--muted);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .ace-reasoning {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      font-style: italic;
+    }
+    .ace-data-table { margin-top: 12px; }
+
+    .quick-questions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .quick-q {
+      padding: 7px 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .quick-q:hover {
+      border-color: var(--green-dim);
+      color: var(--green);
+    }
+
+    /* ── Loading overlay ── */
+    .loading-overlay {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+    .loading-overlay .spinner {
+      width: 32px; height: 32px;
+      border-width: 3px;
+      margin: 0 auto 16px;
+    }
+    .loading-text { font-size: 14px; }
+
+    /* ── CO2 savings ── */
+    .savings-highlight {
+      background: linear-gradient(135deg, rgba(0,232,122,.08), rgba(0,184,95,.04));
+      border: 1px solid rgba(0,232,122,.2);
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .savings-number {
+      font-size: 52px;
+      font-weight: 700;
+      font-family: var(--mono);
+      color: var(--green);
+      line-height: 1;
+    }
+    .savings-label {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    /* ── Progress ring ── */
+    .fleet-score-ring {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      padding: 16px 0;
+    }
+    .ring-wrap { position: relative; width: 120px; height: 120px; }
+    .ring-wrap svg { transform: rotate(-90deg); }
+    .ring-center {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .ring-num {
+      font-size: 26px;
+      font-weight: 700;
+      font-family: var(--mono);
+      color: var(--green);
+      line-height: 1;
+    }
+    .ring-sub { font-size: 10px; color: var(--muted); }
+
+    /* ── Recommendation cards ── */
+    .rec-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+    .rec-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .rec-card-icon { font-size: 22px; margin-bottom: 8px; }
+    .rec-card-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .rec-card-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    .error-msg {
+      color: var(--red);
+      font-size: 13px;
+      padding: 10px;
+      background: rgba(255,71,87,.08);
+      border-radius: 8px;
+      border: 1px solid rgba(255,71,87,.2);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">🌿</div>
+    <div class="logo-text">Green<span>Fleet</span> IQ</div>
+  </div>
+  <div class="header-meta">
+    <span class="live-dot"></span>
+    <span id="header-db">Connecting...</span>
+    &nbsp;·&nbsp; Last 30 days
+  </div>
+</div>
+
+<!-- ── Tabs ──────────────────────────────────────────────── -->
+<div class="tabs">
+  <div class="tab active" onclick="showTab('overview')">
+    <span class="tab-icon">🌍</span>Carbon Overview
+  </div>
+  <div class="tab" onclick="showTab('idle')">
+    <span class="tab-icon">⏱️</span>Idle Analyzer
+  </div>
+  <div class="tab" onclick="showTab('ev')">
+    <span class="tab-icon">⚡</span>EV Readiness
+  </div>
+  <div class="tab" onclick="showTab('ai')">
+    <span class="tab-icon">🤖</span>AI Insights
+  </div>
+</div>
+
+<!-- ── Main content ───────────────────────────────────────── -->
+<div class="main">
+
+  <!-- Loading state -->
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Loading fleet data...</div>
+  </div>
+
+  <!-- ─── OVERVIEW ─── -->
+  <div class="section" id="section-overview">
+    <div class="kpi-row" id="kpi-row"></div>
+
+    <div class="savings-highlight" id="savings-box">
+      <div class="savings-number" id="co2-total">—</div>
+      <div class="savings-label">tonnes CO₂ emitted in last 30 days · Estimated from fuel &amp; idle data</div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title"><span>▸</span> CO₂ by Vehicle (Top 15)</div>
+        <div class="chart-wrap-tall"><canvas id="chart-co2"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>▸</span> Fleet Efficiency Breakdown</div>
+        <div class="fleet-score-ring" id="ring-section"></div>
+        <div class="chart-wrap"><canvas id="chart-donut"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── IDLE ─── -->
+  <div class="section" id="section-idle">
+    <div class="kpi-row" id="idle-kpi-row"></div>
+    <div class="card">
+      <div class="card-title"><span>▸</span> Idle Time Ranking — Worst Offenders</div>
+      <div class="chart-wrap-tall"><canvas id="chart-idle"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>▸</span> Idle Detail by Vehicle</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Vehicle</th>
+              <th>Total Idle (hrs)</th>
+              <th>Idle %</th>
+              <th>Est. Wasted Fuel (L)</th>
+              <th>CO₂ from Idle (kg)</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="idle-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── EV READINESS ─── -->
+  <div class="section" id="section-ev">
+    <div class="kpi-row" id="ev-kpi-row"></div>
+
+    <div class="rec-grid" id="ev-recommendations"></div>
+
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title"><span>▸</span> EV Readiness Score — All Vehicles</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Vehicle</th>
+              <th>Avg Daily km</th>
+              <th>Idle %</th>
+              <th>Trips / Day</th>
+              <th>EV Score</th>
+              <th>Recommendation</th>
+            </tr>
+          </thead>
+          <tbody id="ev-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── AI INSIGHTS ─── -->
+  <div class="section" id="section-ai">
+    <div class="card">
+      <div class="card-title"><span>▸</span> Ask Geotab Ace AI</div>
+
+      <div class="quick-questions">
+        <div class="quick-q" onclick="askQuick('Which vehicles have the highest idle time as % of total engine-on time last 30 days? Return columns: device_name, idle_pct, idle_hours')">🔥 Top idlers</div>
+        <div class="quick-q" onclick="askQuick('What is the fuel consumption trend over the last 30 days for my fleet? Return columns: date, total_fuel_litres')">⛽ Fuel trend</div>
+        <div class="quick-q" onclick="askQuick('Which vehicles drove the most distance last 30 days? Return columns: device_name, total_km, trip_count')">🛣️ Top drivers</div>
+        <div class="quick-q" onclick="askQuick('What is the average distance per trip per vehicle last 30 days? Return columns: device_name, avg_trip_km, trip_count')">📏 Trip averages</div>
+        <div class="quick-q" onclick="askQuick('Which vehicles have the highest fuel consumption per km? Return columns: device_name, fuel_per_km, total_fuel_litres')">💡 Fuel efficiency</div>
+      </div>
+
+      <div class="ace-input-row">
+        <input class="ace-input" id="ace-input" type="text"
+          placeholder="e.g. Which 5 vehicles would save the most CO2 by switching to EV?"
+          onkeydown="if(event.key==='Enter')sendAce()">
+        <button class="btn btn-green" id="ace-btn" onclick="sendAce()">Ask AI ✦</button>
+      </div>
+
+      <div class="ace-response" id="ace-response">
+        <div style="color:var(--muted);font-size:13px;">
+          Ask a question about your fleet's environmental performance. Geotab Ace AI will analyze your data and respond with insights.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+"use strict";
+
+// ── State ──────────────────────────────────────────────────────
+var apiRef = null;
+var fleetData = { trips: [], devices: [], deviceMap: {} };
+var charts = {};
+
+// ── CO2 constants ──────────────────────────────────────────────
+var CO2_PER_LITRE   = 2.31;   // kg CO2 per litre gasoline
+var FUEL_PER_KM     = 0.10;   // litres/km average (10L/100km)
+var IDLE_FUEL_L_HR  = 0.8;    // litres per hour idling
+
+// ── Tab navigation ─────────────────────────────────────────────
+function showTab(name) {
+  var tabs = document.querySelectorAll('.tab');
+  var sections = document.querySelectorAll('.section');
+  tabs.forEach(function(t) { t.classList.remove('active'); });
+  sections.forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById('section-' + name).classList.add('active');
+  var idx = ['overview','idle','ev','ai'].indexOf(name);
+  tabs[idx].classList.add('active');
+}
+
+// ── Utilities ──────────────────────────────────────────────────
+function fmt(n, dec) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  return Number(n).toLocaleString(undefined, { maximumFractionDigits: dec || 0 });
+}
+function pct(a, b) { return b > 0 ? (a / b * 100) : 0; }
+
+function evColor(score) {
+  if (score >= 75) return '#00e87a';
+  if (score >= 50) return '#4ecdc4';
+  if (score >= 30) return '#f5a623';
+  return '#ff4757';
+}
+function evLabel(score) {
+  if (score >= 75) return ['Ready', 'badge-green'];
+  if (score >= 50) return ['Good Fit', 'badge-blue'];
+  if (score >= 30) return ['Consider', 'badge-amber'];
+  return ['Not Ready', 'badge-red'];
+}
+
+// ── Main data load ─────────────────────────────────────────────
+function loadFleetData(api) {
+  apiRef = api;
+
+  var now = new Date();
+  var from = new Date(now - 30 * 24 * 3600 * 1000);
+
+  // Parallel: devices + trips
+  api.call('Get', { typeName: 'Device' }, function(devices) {
+    fleetData.devices = devices;
+    devices.forEach(function(d) { fleetData.deviceMap[d.id] = d.name; });
+
+    api.call('Get', {
+      typeName: 'Trip',
+      search: {
+        fromDate: from.toISOString(),
+        toDate: now.toISOString()
+      },
+      resultsLimit: 50000
+    }, function(trips) {
+      fleetData.trips = trips;
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('section-overview').classList.add('active');
+      buildOverview();
+      buildIdle();
+      buildEV();
+    }, function(err) {
+      showError('Failed to load trips: ' + err);
+    });
+  }, function(err) {
+    showError('Failed to load devices: ' + err);
+  });
+}
+
+function showError(msg) {
+  document.getElementById('loading').innerHTML =
+    '<div class="error-msg">⚠️ ' + msg + '</div>';
+}
+
+// ── Per-vehicle aggregation ────────────────────────────────────
+function aggregateByVehicle() {
+  var byVehicle = {};
+
+  fleetData.trips.forEach(function(trip) {
+    var id = trip.device && trip.device.id;
+    if (!id) return;
+    if (!byVehicle[id]) {
+      byVehicle[id] = {
+        id: id,
+        name: fleetData.deviceMap[id] || id,
+        distanceKm: 0,
+        driveSec: 0,
+        idleSec: 0,
+        tripCount: 0,
+        activeDays: {}
+      };
+    }
+    var v = byVehicle[id];
+    // Trip distance: Trip.distance is in METERS per API_QUICKSTART
+    v.distanceKm += (trip.distance || 0) / 1000;
+    v.driveSec   += trip.drivingDuration
+      ? (trip.drivingDuration.ticks ? trip.drivingDuration.ticks / 10000000 : 0) : 0;
+    v.idleSec    += trip.idlingDuration
+      ? (trip.idlingDuration.ticks ? trip.idlingDuration.ticks / 10000000 : 0) : 0;
+    v.tripCount  += 1;
+    if (trip.start) {
+      v.activeDays[trip.start.substring(0, 10)] = true;
+    }
+  });
+
+  // Compute derived metrics
+  Object.keys(byVehicle).forEach(function(id) {
+    var v = byVehicle[id];
+    v.idleHrs       = v.idleSec / 3600;
+    v.driveHrs      = v.driveSec / 3600;
+    v.totalHrs      = v.idleHrs + v.driveHrs;
+    v.idlePct       = pct(v.idleHrs, v.totalHrs);
+    v.activeDayCount = Object.keys(v.activeDays).length || 1;
+    v.avgDailyKm    = v.distanceKm / v.activeDayCount;
+    v.tripsPerDay   = v.tripCount / v.activeDayCount;
+
+    // Fuel & CO2
+    v.fuelDrive  = v.distanceKm * FUEL_PER_KM;
+    v.fuelIdle   = v.idleHrs * IDLE_FUEL_L_HR;
+    v.totalFuel  = v.fuelDrive + v.fuelIdle;
+    v.co2Total   = v.totalFuel * CO2_PER_LITRE;  // kg
+    v.co2Idle    = v.fuelIdle * CO2_PER_LITRE;
+
+    // EV Score (0-100)
+    var scoreKm    = v.avgDailyKm <= 200 ? Math.max(0, (200 - v.avgDailyKm) / 200 * 40) : 0;
+    var scoreIdle  = Math.min(v.idlePct / 100 * 30, 30);
+    var scoreTrips = v.tripsPerDay >= 2 ? 20 : v.tripsPerDay * 10;
+    var scoreConst = 10;
+    v.evScore = Math.min(100, Math.round(scoreKm + scoreIdle + scoreTrips + scoreConst));
+  });
+
+  return Object.values(byVehicle).filter(function(v) { return v.tripCount > 0; });
+}
+
+// ── OVERVIEW ──────────────────────────────────────────────────
+function buildOverview() {
+  var vehicles = aggregateByVehicle();
+  var totalCO2   = vehicles.reduce(function(s, v) { return s + v.co2Total; }, 0) / 1000; // tonnes
+  var totalFuel  = vehicles.reduce(function(s, v) { return s + v.totalFuel; }, 0);
+  var totalIdleH = vehicles.reduce(function(s, v) { return s + v.idleHrs; }, 0);
+  var totalKm    = vehicles.reduce(function(s, v) { return s + v.distanceKm; }, 0);
+  var avgEff     = totalKm > 0 ? (totalFuel / totalKm * 100) : 0; // L/100km
+
+  // KPIs
+  document.getElementById('kpi-row').innerHTML =
+    kpiCard('Total CO₂', fmt(totalCO2, 1) + ' t', 'red', 'Past 30 days') +
+    kpiCard('Fuel Used', fmt(totalFuel / 1000, 1) + ' kL', 'amber', 'Estimated from distance') +
+    kpiCard('Total Distance', fmt(totalKm / 1000, 0) + ' K km', 'blue', 'All vehicles') +
+    kpiCard('Fleet Avg', fmt(avgEff, 1) + ' L/100km', 'green', 'Fuel efficiency') +
+    kpiCard('Idle Hours', fmt(totalIdleH, 0) + ' hrs', 'amber', 'Engine on, not moving');
+
+  document.getElementById('co2-total').textContent = fmt(totalCO2, 1);
+
+  // Bar chart — top 15 by CO2
+  var sorted = vehicles.slice().sort(function(a,b){return b.co2Total - a.co2Total;}).slice(0,15);
+  if (charts['co2']) charts['co2'].destroy();
+  charts['co2'] = new Chart(document.getElementById('chart-co2'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(function(v){ return v.name; }),
+      datasets: [{
+        label: 'CO₂ (kg)',
+        data: sorted.map(function(v){ return Math.round(v.co2Total); }),
+        backgroundColor: sorted.map(function(v,i){
+          return i < 3 ? '#ff4757' : i < 7 ? '#f5a623' : '#00e87a';
+        }),
+        borderRadius: 4
+      }]
+    },
+    options: chartOpts('CO₂ emissions (kg)', true)
+  });
+
+  // Donut — drive vs idle fuel
+  var driveFuel = vehicles.reduce(function(s,v){return s+v.fuelDrive;},0);
+  var idleFuel  = vehicles.reduce(function(s,v){return s+v.fuelIdle;},0);
+  if (charts['donut']) charts['donut'].destroy();
+  charts['donut'] = new Chart(document.getElementById('chart-donut'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Drive Fuel', 'Idle Fuel (Wasted)'],
+      datasets: [{
+        data: [Math.round(driveFuel), Math.round(idleFuel)],
+        backgroundColor: ['#00e87a', '#ff4757'],
+        borderColor: '#162019',
+        borderWidth: 3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#6b8a72', font: { family: 'JetBrains Mono', size: 11 } } }
+      },
+      cutout: '65%'
+    }
+  });
+
+  // Ring score
+  var greenVehicles = vehicles.filter(function(v){ return v.evScore >= 50; }).length;
+  var ringPct = vehicles.length > 0 ? Math.round(greenVehicles / vehicles.length * 100) : 0;
+  document.getElementById('ring-section').innerHTML =
+    '<div>' +
+    '<div class="ring-wrap">' +
+    svgRing(ringPct, '#00e87a') +
+    '<div class="ring-center"><div class="ring-num">' + ringPct + '%</div><div class="ring-sub">EV Ready</div></div>' +
+    '</div>' +
+    '<div style="font-size:13px;color:var(--muted);line-height:1.8;">' +
+    '<div><b style="color:var(--text)">' + greenVehicles + '</b> EV-ready vehicles</div>' +
+    '<div><b style="color:var(--text)">' + vehicles.length + '</b> total active</div>' +
+    '<div style="margin-top:8px;font-size:11px;">Score ≥50 = EV candidate</div>' +
+    '</div></div>';
+}
+
+function svgRing(pct, color) {
+  var r = 52; var circ = 2 * Math.PI * r;
+  var dash = (pct / 100) * circ;
+  return '<svg width="120" height="120" viewBox="0 0 120 120">' +
+    '<circle cx="60" cy="60" r="' + r + '" fill="none" stroke="#1e3022" stroke-width="10"/>' +
+    '<circle cx="60" cy="60" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="10"' +
+    ' stroke-dasharray="' + dash + ' ' + circ + '" stroke-linecap="round"/>' +
+    '</svg>';
+}
+
+function kpiCard(label, value, colorClass, sub) {
+  return '<div class="kpi">' +
+    '<div class="kpi-label">' + label + '</div>' +
+    '<div class="kpi-value ' + colorClass + '">' + value + '</div>' +
+    '<div class="kpi-sub">' + sub + '</div>' +
+    '</div>';
+}
+
+function chartOpts(yLabel, horizontal) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    indexAxis: horizontal ? 'y' : 'x',
+    plugins: {
+      legend: { display: false }
+    },
+    scales: {
+      x: {
+        ticks: { color: '#6b8a72', font: { family: 'JetBrains Mono', size: 10 } },
+        grid: { color: '#1e3022' }
+      },
+      y: {
+        ticks: { color: '#6b8a72', font: { family: 'JetBrains Mono', size: 10 } },
+        grid: { color: '#1e3022' }
+      }
+    }
+  };
+}
+
+// ── IDLE ──────────────────────────────────────────────────────
+function buildIdle() {
+  var vehicles = aggregateByVehicle()
+    .sort(function(a,b){ return b.idleHrs - a.idleHrs; });
+
+  var totalIdleH  = vehicles.reduce(function(s,v){return s+v.idleHrs;},0);
+  var totalWasted = vehicles.reduce(function(s,v){return s+v.fuelIdle;},0);
+  var totalIdleCO2 = totalWasted * CO2_PER_LITRE;
+
+  document.getElementById('idle-kpi-row').innerHTML =
+    kpiCard('Total Idle Hours', fmt(totalIdleH, 0) + ' hrs', 'amber', 'Fleet-wide, 30 days') +
+    kpiCard('Wasted Fuel', fmt(totalWasted, 0) + ' L', 'red', 'Fuel burned idling') +
+    kpiCard('CO₂ from Idle', fmt(totalIdleCO2 / 1000, 2) + ' t', 'red', 'Preventable emissions') +
+    kpiCard('Worst Offender', vehicles[0] ? vehicles[0].name.split(' ').slice(0,2).join(' ') : '—', 'amber', fmt(vehicles[0] ? vehicles[0].idleHrs : 0, 1) + ' hrs idle');
+
+  // Bar chart — top 20 idlers
+  var top20 = vehicles.slice(0, 20);
+  if (charts['idle']) charts['idle'].destroy();
+  charts['idle'] = new Chart(document.getElementById('chart-idle'), {
+    type: 'bar',
+    data: {
+      labels: top20.map(function(v){ return v.name; }),
+      datasets: [
+        {
+          label: 'Idle Hours',
+          data: top20.map(function(v){ return +v.idleHrs.toFixed(1); }),
+          backgroundColor: '#f5a623',
+          borderRadius: 4
+        },
+        {
+          label: 'CO₂ from Idle (kg)',
+          data: top20.map(function(v){ return +v.co2Idle.toFixed(1); }),
+          backgroundColor: '#ff4757',
+          borderRadius: 4
+        }
+      ]
+    },
+    options: (function(){
+      var o = chartOpts('', true);
+      o.plugins.legend = { labels: { color:'#6b8a72', font:{family:'JetBrains Mono',size:11} } };
+      return o;
+    })()
+  });
+
+  // Table
+  var tbody = document.getElementById('idle-table');
+  tbody.innerHTML = vehicles.map(function(v, i) {
+    var idlePctVal = v.idlePct;
+    var statusClass = idlePctVal > 25 ? 'badge-red' : idlePctVal > 15 ? 'badge-amber' : 'badge-green';
+    var statusText  = idlePctVal > 25 ? 'Critical' : idlePctVal > 15 ? 'High' : 'Normal';
+    return '<tr>' +
+      '<td style="color:var(--muted)">' + (i+1) + '</td>' +
+      '<td style="color:var(--text);font-family:var(--font)">' + v.name + '</td>' +
+      '<td>' + fmt(v.idleHrs, 1) + '</td>' +
+      '<td>' + fmt(v.idlePct, 1) + '%</td>' +
+      '<td>' + fmt(v.fuelIdle, 0) + '</td>' +
+      '<td>' + fmt(v.co2Idle, 0) + '</td>' +
+      '<td><span class="badge ' + statusClass + '">' + statusText + '</span></td>' +
+      '</tr>';
+  }).join('');
+}
+
+// ── EV READINESS ──────────────────────────────────────────────
+function buildEV() {
+  var vehicles = aggregateByVehicle()
+    .sort(function(a,b){ return b.evScore - a.evScore; });
+
+  var ready    = vehicles.filter(function(v){return v.evScore>=75;}).length;
+  var goodFit  = vehicles.filter(function(v){return v.evScore>=50&&v.evScore<75;}).length;
+  var consider = vehicles.filter(function(v){return v.evScore>=30&&v.evScore<50;}).length;
+  var notReady = vehicles.filter(function(v){return v.evScore<30;}).length;
+
+  // Estimated annual CO2 savings if top EV candidates switch
+  var evCandidates = vehicles.filter(function(v){return v.evScore>=50;});
+  var potentialSavingKg = evCandidates.reduce(function(s,v){return s+v.co2Total;},0) * 12 * 0.85;
+
+  document.getElementById('ev-kpi-row').innerHTML =
+    kpiCard('EV Ready', ready, 'green', 'Score ≥ 75') +
+    kpiCard('Good Fit', goodFit, 'blue', 'Score 50–74') +
+    kpiCard('Consider', consider, 'amber', 'Score 30–49') +
+    kpiCard('Not Ready', notReady, 'red', 'Score < 30') +
+    kpiCard('Annual CO₂ Savings', fmt(potentialSavingKg/1000,0)+' t', 'green', 'If candidates switch to EV');
+
+  // Recommendation cards
+  document.getElementById('ev-recommendations').innerHTML =
+    '<div class="rec-card"><div class="rec-card-icon">⚡</div>' +
+    '<div class="rec-card-title">Switch ' + ready + ' vehicles to EV now</div>' +
+    '<div class="rec-card-desc">These vehicles score ≥75 — short daily routes, high idle, frequent stops. Perfect EV profile.</div></div>' +
+
+    '<div class="rec-card"><div class="rec-card-icon">🛠️</div>' +
+    '<div class="rec-card-title">Reduce idle on ' + (vehicles.filter(function(v){return v.idlePct>20;}).length) + ' vehicles</div>' +
+    '<div class="rec-card-desc">Idle >20% of engine time. Auto-shutoff policy could save thousands of litres annually.</div></div>' +
+
+    '<div class="rec-card"><div class="rec-card-icon">🌿</div>' +
+    '<div class="rec-card-title">~' + fmt(potentialSavingKg/1000,0) + ' tonnes CO₂ saved</div>' +
+    '<div class="rec-card-desc">Estimated annual reduction if EV-ready vehicles transition to electric over the next year.</div></div>' +
+
+    '<div class="rec-card"><div class="rec-card-icon">💰</div>' +
+    '<div class="rec-card-title">Fuel cost reduction opportunity</div>' +
+    '<div class="rec-card-desc">EV candidates use ~' + fmt(evCandidates.reduce(function(s,v){return s+v.totalFuel;},0)*12/1000,0) + 'kL/year. Electricity cost ~60% less than diesel.</div></div>';
+
+  // Table
+  var tbody = document.getElementById('ev-table');
+  tbody.innerHTML = vehicles.map(function(v, i) {
+    var lbl = evLabel(v.evScore);
+    var bar = '<div class="ev-bar-wrap">' +
+      '<div class="ev-bar-bg"><div class="ev-bar-fill" style="width:' + v.evScore + '%;background:' + evColor(v.evScore) + '"></div></div>' +
+      '<div class="ev-score-num" style="color:' + evColor(v.evScore) + '">' + v.evScore + '</div>' +
+      '</div>';
+    return '<tr>' +
+      '<td style="color:var(--muted)">' + (i+1) + '</td>' +
+      '<td style="color:var(--text);font-family:var(--font)">' + v.name + '</td>' +
+      '<td>' + fmt(v.avgDailyKm, 0) + '</td>' +
+      '<td>' + fmt(v.idlePct, 1) + '%</td>' +
+      '<td>' + fmt(v.tripsPerDay, 1) + '</td>' +
+      '<td style="min-width:160px">' + bar + '</td>' +
+      '<td><span class="badge ' + lbl[1] + '">' + lbl[0] + '</span></td>' +
+      '</tr>';
+  }).join('');
+}
+
+// ── ACE AI ────────────────────────────────────────────────────
+var aceRunning = false;
+
+function askQuick(q) {
+  document.getElementById('ace-input').value = q;
+  sendAce();
+}
+
+function sendAce() {
+  if (aceRunning || !apiRef) return;
+  var q = document.getElementById('ace-input').value.trim();
+  if (!q) return;
+
+  aceRunning = true;
+  document.getElementById('ace-btn').disabled = true;
+  document.getElementById('ace-response').innerHTML =
+    '<div class="ace-thinking"><div class="spinner"></div>Ace is analyzing your fleet data… (30-60s)</div>';
+
+  var retries = 0;
+
+  function createChat() {
+    apiRef.call('GetAceResults', {
+      serviceName: 'dna-planet-orchestration',
+      functionName: 'create-chat',
+      customerData: true,
+      parameters: {}
+    }, function(res) {
+      var chatId = res && (res.chat_id || (res.result && res.result.chat_id));
+      if (!chatId && retries < 3) {
+        retries++;
+        setTimeout(createChat, 3000);
+        return;
+      }
+      if (!chatId) { aceError('Could not start Ace chat. Is Ace enabled in Administration > Beta Features?'); return; }
+      sendPrompt(chatId);
+    }, aceError);
+  }
+
+  function sendPrompt(chatId) {
+    apiRef.call('GetAceResults', {
+      serviceName: 'dna-planet-orchestration',
+      functionName: 'send-prompt',
+      customerData: true,
+      parameters: { chat_id: chatId, prompt: q }
+    }, function(res) {
+      var msgGroupId = res && (res.message_group_id || (res.result && res.result.message_group_id));
+      if (!msgGroupId) { aceError('No message_group_id from Ace.'); return; }
+      setTimeout(function(){ pollResult(chatId, msgGroupId, 0); }, 8000);
+    }, aceError);
+  }
+
+  function pollResult(chatId, msgGroupId, attempts) {
+    if (attempts > 30) { aceError('Ace timed out after 2.5 minutes.'); return; }
+    apiRef.call('GetAceResults', {
+      serviceName: 'dna-planet-orchestration',
+      functionName: 'get-message-group',
+      customerData: true,
+      parameters: { chat_id: chatId, message_group_id: msgGroupId }
+    }, function(res) {
+      var status = res && res.status;
+      if (status === 'DONE' || status === 'done') {
+        renderAceResult(res);
+      } else {
+        setTimeout(function(){ pollResult(chatId, msgGroupId, attempts+1); }, 5000);
+      }
+    }, function(err) {
+      setTimeout(function(){ pollResult(chatId, msgGroupId, attempts+1); }, 5000);
+    });
+  }
+
+  createChat();
+}
+
+function renderAceResult(res) {
+  aceRunning = false;
+  document.getElementById('ace-btn').disabled = false;
+
+  var reasoning = (res && res.reasoning) || '';
+  var preview   = (res && res.preview_array) || [];
+  var columns   = (res && res.columns) || [];
+
+  var html = '';
+  if (reasoning) {
+    html += '<div class="ace-reasoning">💭 ' + reasoning + '</div>';
+  }
+
+  if (preview && preview.length > 0) {
+    html += '<div class="ace-data-table"><table>';
+    if (columns.length) {
+      html += '<thead><tr>' + columns.map(function(c){return '<th>'+c+'</th>';}).join('') + '</tr></thead>';
+    }
+    html += '<tbody>' + preview.map(function(row){
+      return '<tr>' + Object.values(row).map(function(v){return '<td>'+v+'</td>';}).join('') + '</tr>';
+    }).join('') + '</tbody></table></div>';
+    html += '<div style="color:var(--muted);font-size:11px;margin-top:10px;">Showing ' + preview.length + ' rows from Ace AI</div>';
+  }
+
+  if (!html) {
+    html = '<div style="color:var(--muted);font-size:13px;">Ace returned no data for this query. Try rephrasing.</div>';
+  }
+
+  document.getElementById('ace-response').innerHTML = html;
+}
+
+function aceError(err) {
+  aceRunning = false;
+  document.getElementById('ace-btn').disabled = false;
+  document.getElementById('ace-response').innerHTML =
+    '<div class="error-msg">⚠️ Ace error: ' + (err && err.message ? err.message : String(err)) +
+    '<br><small>Make sure Ace is enabled: Administration > Beta Features > Ace</small></div>';
+}
+
+// ── Geotab Add-In registration ─────────────────────────────────
+geotab.addin["greenfleet-iq"] = function() {
+  return {
+    initialize: function(api, state, callback) {
+      api.getSession(function(session) {
+        document.getElementById('header-db').textContent = session.database || 'Fleet';
+      });
+      loadFleetData(api);
+      callback();
+    },
+    focus: function(api, state) {
+      apiRef = api;
+    },
+    blur: function(api, state) {}
+  };
+};
+</script>
+</body>
+</html>

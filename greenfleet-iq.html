@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
+<!-- saved from url=(0053)file:///C:/Users/tabac/Downloads/greenfleet-iq_3.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
   <title>GreenFleet IQ</title>
-  <link rel="stylesheet" href="greenfleet-iq.css">
+  <link rel="stylesheet" href="file:///C:/Users/tabac/Downloads/greenfleet-iq.css">
 </head>
 <body>
 
@@ -48,7 +48,7 @@
       <div class="kpi-card blue">
         <div class="kpi-label">⚡ EV-Ready Vehicles</div>
         <div class="kpi-value" id="kpi-ev">—<span class="unit"></span></div>
-        <div class="kpi-desc">Score ≥ 70: range fits, high idle, short trips</div>
+        <div class="kpi-desc">Score ≥ 75: daily range fits EV, idle waste, trip pattern</div>
         <div class="kpi-insight" id="kpi-ev-insight"></div>
       </div>
 
@@ -126,20 +126,20 @@ function showError(msg) {
 }
 function evScore(avgDailyKm, idlePct, tripsPerDay) {
   var s = 0;
-  // Range fit: ≤150 km = full 40pts, linear above
-  s += Math.max(0, Math.min(40, (150 - avgDailyKm) / 150 * 40));
-  // High idle = EV shines (no idle waste)
-  s += Math.min(30, idlePct / 100 * 30);
-  // Multiple short trips per day
-  s += Math.min(20, tripsPerDay * 7);
+  // Range: ≤200 km/day = 40pts (modern EVs do 300+ km)
+  s += Math.max(0, Math.min(40, (200 - avgDailyKm) / 200 * 40));
+  // Idle: 25%+ = full 30pts (EV eliminates idle waste entirely)
+  s += Math.min(30, idlePct / 25 * 30);
+  // Trips: 2+ trips/day = full 20pts (frequent stop-start = EV sweet spot)
+  s += Math.min(20, tripsPerDay / 2 * 20);
   // Base
   s += 10;
   return Math.min(100, Math.round(s));
 }
 function evVerdict(score) {
-  if (score >= 70) return ["EV Ready", "pill-green"];
-  if (score >= 50) return ["Good Fit", "pill-blue"];
-  if (score >= 35) return ["Consider", "pill-orange"];
+  if (score >= 75) return ["EV Ready",  "pill-green"];
+  if (score >= 55) return ["Good Fit",  "pill-blue"];
+  if (score >= 40) return ["Consider",  "pill-orange"];
   return ["Not Yet", "pill-red"];
 }
 function progressBar(pct, color) {
@@ -259,7 +259,7 @@ geotab.addin["greenfleet-iq"] = function () {
     var totalIdleFuel = vehicles.reduce(function (s, v) { return s + v.idleFuelL; }, 0);
     var totalFuel     = vehicles.reduce(function (s, v) { return s + v.totalFuelL; }, 0);
     var fleetIdlePct  = totalFuel > 0 ? totalIdleFuel / totalFuel * 100 : 0;
-    var evReady       = vehicles.filter(function (v) { return v.evScore >= 70; });
+    var evReady       = vehicles.filter(function (v) { return v.evScore >= 75; });
 
     // ── KPI cards ──────────────────────────────────────────
     var co2T = totalCO2Kg / 1000;
@@ -325,7 +325,7 @@ geotab.addin["greenfleet-iq"] = function () {
     var evSorted = vehicles.slice().sort(function (a, b) { return b.evScore - a.evScore; }).slice(0, 10);
     document.getElementById("ev-tbody").innerHTML = evSorted.map(function (v) {
       var verdict = evVerdict(v.evScore);
-      var scoreColor = v.evScore >= 70 ? "#107C10" : v.evScore >= 50 ? "#0078D4" : v.evScore >= 35 ? "#7A4F00" : "#D13438";
+      var scoreColor = v.evScore >= 75 ? "#107C10" : v.evScore >= 55 ? "#0078D4" : v.evScore >= 40 ? "#7A4F00" : "#D13438";
       return "<tr>" +
         "<td><strong>" + v.name + "</strong></td>" +
         "<td>" + fmt(v.avgDailyKm, 0) + " km</td>" +
@@ -354,10 +354,14 @@ geotab.addin["greenfleet-iq"] = function () {
       run(api);
       callback();
     },
-    focus: function (api, state) {},
-    blur:  function (api, state) {}
+    focus: function (api, state) {
+      // intentionally no-op: data loaded once on initialize
+      // re-running on focus would cause "Add-In threw error" on WebSocket reconnect
+    },
+    blur: function (api, state) {}
   };
 };
 </script>
-</body>
-</html>
+
+
+</body></html>

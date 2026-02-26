@@ -2,362 +2,583 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GreenFleet IQ (Zenith)</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <title>GreenFleet IQ</title>
   <style>
+    /* ── Zenith design tokens ── */
     :root {
-      --app-gap: 16px;
+      --z-blue:      #0078D4;
+      --z-blue-dark: #005A9E;
+      --z-green:     #107C10;
+      --z-warning:   #FFB900;
+      --z-red:       #D13438;
+      --z-neutral-900: #201F1E;
+      --z-neutral-600: #605E5C;
+      --z-neutral-300: #C8C6C4;
+      --z-neutral-100: #EDEBE9;
+      --z-white:     #FFFFFF;
+      --z-font: 'Segoe UI', -apple-system, sans-serif;
+      --z-radius: 4px;
     }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      margin: 0;
-      font-family: var(--zenith-font-family, 'Segoe UI', sans-serif);
-      background: var(--zenith-neutral-0, #fff);
-      color: var(--zenith-neutral-900, #201f1e);
+      font-family: var(--z-font);
+      font-size: 14px;
+      color: var(--z-neutral-900);
+      background: var(--z-neutral-100);
+      padding: 24px;
     }
-    #app { padding: 20px; }
-    .header { display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px; }
-    .tabs { display:flex; gap:8px; margin-bottom:16px; }
-    .grid-5 { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+
+    /* ── Page header ── */
+    .page-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .page-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--z-neutral-900);
+    }
+    .page-subtitle {
+      font-size: 12px;
+      color: var(--z-neutral-600);
+      margin-top: 2px;
+    }
+    .db-label {
+      font-size: 12px;
+      color: var(--z-neutral-600);
+      background: var(--z-white);
+      border: 1px solid var(--z-neutral-300);
+      border-radius: var(--z-radius);
+      padding: 4px 10px;
+    }
+
+    /* ── Loading ── */
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 24px;
+      gap: 16px;
+      color: var(--z-neutral-600);
+      font-size: 14px;
+    }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid var(--z-neutral-300);
+      border-top-color: var(--z-blue);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Error banner ── */
+    .error-banner {
+      background: #FDE7E9;
+      border-left: 4px solid var(--z-red);
+      border-radius: var(--z-radius);
+      padding: 14px 16px;
+      color: var(--z-red);
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* ── KPI cards row ── */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
     .kpi-card {
-      border: 1px solid var(--zenith-neutral-100, #edebe9);
-      border-radius: 8px;
-      padding: 12px;
-      background: #fff;
+      background: var(--z-white);
+      border: 1px solid var(--z-neutral-300);
+      border-radius: var(--z-radius);
+      padding: 20px 24px;
+      border-top: 3px solid var(--z-neutral-300);
     }
-    .kpi-label { font-size: 12px; color: var(--zenith-neutral-600, #605e5c); }
-    .kpi-value { font-size: 28px; font-weight: 700; margin-top: 4px; }
-    .kpi-sub { font-size: 12px; color: var(--zenith-neutral-600, #605e5c); }
-    .card {
-      border: 1px solid var(--zenith-neutral-100, #edebe9);
-      border-radius: 8px;
-      padding: 12px;
-      margin-top: 16px;
-      background: #fff;
+    .kpi-card.green  { border-top-color: var(--z-green); }
+    .kpi-card.orange { border-top-color: var(--z-warning); }
+    .kpi-card.blue   { border-top-color: var(--z-blue); }
+
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--z-neutral-600);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
     }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--zenith-neutral-100, #edebe9); }
-    .table-wrap { overflow-x:auto; }
-    .badge { border-radius: 999px; padding: 2px 8px; font-size: 11px; }
-    .badge-good { background: #dff6dd; color: #0f6b0f; }
-    .badge-mid { background: #fff4ce; color: #8a5300; }
-    .badge-bad { background: #fde7e9; color: #a4262c; }
-    .section { display:none; }
-    .section.active { display:block; }
-    .ace-row { display:flex; gap:10px; align-items:flex-end; }
-    .quick { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+    .kpi-value {
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--z-neutral-900);
+      margin-bottom: 4px;
+    }
+    .kpi-value .unit {
+      font-size: 16px;
+      font-weight: 400;
+      color: var(--z-neutral-600);
+      margin-left: 2px;
+    }
+    .kpi-desc {
+      font-size: 12px;
+      color: var(--z-neutral-600);
+      line-height: 1.4;
+      margin-top: 4px;
+    }
+    .kpi-insight {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--z-neutral-100);
+      font-size: 12px;
+      color: var(--z-neutral-600);
+    }
+    .kpi-insight strong {
+      color: var(--z-neutral-900);
+    }
+
+    /* ── Section card ── */
+    .section-card {
+      background: var(--z-white);
+      border: 1px solid var(--z-neutral-300);
+      border-radius: var(--z-radius);
+      margin-bottom: 16px;
+    }
+    .section-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--z-neutral-100);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--z-neutral-900);
+    }
+    .section-body {
+      padding: 0;
+    }
+
+    /* ── Table ── */
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left;
+      padding: 10px 24px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--z-neutral-600);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: var(--z-neutral-100);
+      border-bottom: 1px solid var(--z-neutral-300);
+    }
+    td {
+      padding: 12px 24px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--z-neutral-100);
+      color: var(--z-neutral-900);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #F3F2F1; }
+
+    /* ── Pill badges ── */
+    .pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .pill-green  { background: #DFF6DD; color: #107C10; }
+    .pill-orange { background: #FFF4CE; color: #7A4F00; }
+    .pill-red    { background: #FDE7E9; color: #D13438; }
+    .pill-blue   { background: #EFF6FC; color: #0078D4; }
+
+    /* ── Progress bar ── */
+    .progress-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .progress-bg {
+      flex: 1;
+      height: 6px;
+      background: var(--z-neutral-100);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+    .progress-label {
+      font-size: 12px;
+      color: var(--z-neutral-600);
+      min-width: 32px;
+      text-align: right;
+    }
+
+    /* ── Highlight box ── */
+    .highlight-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      background: #EFF6FC;
+      border-radius: var(--z-radius);
+      border: 1px solid #C7E0F4;
+      margin: 16px 24px;
+      font-size: 13px;
+      color: var(--z-neutral-900);
+    }
+    .highlight-box .icon { font-size: 20px; }
+
+    /* ── Idle bar inline ── */
+    .idle-bar-cell { min-width: 120px; }
+
+    @media (max-width: 700px) {
+      .kpi-row { grid-template-columns: 1fr; }
+      body { padding: 16px; }
+    }
   </style>
-  <link rel="stylesheet" href="https://esm.sh/@geotab/zenith/dist/index.css">
 </head>
 <body>
-  <div id="app"></div>
 
-  <script type="module">
-    import React, { useEffect, useMemo, useState } from 'https://esm.sh/react@18.2.0';
-    import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-    import { FeedbackProvider, Button, TextInput, Alert, Waiting } from 'https://esm.sh/@geotab/zenith@9.0.0';
+  <!-- Page header -->
+  <div class="page-header">
+    <div>
+      <div class="page-title">🌿 GreenFleet IQ</div>
+      <div class="page-subtitle">Fuel waste &amp; EV readiness · Last 7 days</div>
+    </div>
+    <span class="db-label" id="db-label">Loading...</span>
+  </div>
 
-    const h = React.createElement;
+  <!-- Error -->
+  <div class="error-banner" id="error-banner"></div>
 
-    const CO2_PER_LITRE = 2.31;
-    const FUEL_PER_KM = 0.10;
-    const IDLE_FUEL_L_HR = 0.8;
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <span>Fetching fleet data...</span>
+  </div>
 
-    function fmt(n, dec = 0) {
-      if (n === null || n === undefined || Number.isNaN(n)) return '—';
-      return Number(n).toLocaleString(undefined, { maximumFractionDigits: dec });
-    }
-    function pct(a, b) { return b > 0 ? (a / b * 100) : 0; }
+  <!-- Content (hidden until loaded) -->
+  <div id="content" style="display:none">
 
-    function aggregateByVehicle(trips, deviceMap) {
-      const byVehicle = {};
-      trips.forEach((trip) => {
-        const id = trip.device && trip.device.id;
-        if (!id) return;
-        if (!byVehicle[id]) {
-          byVehicle[id] = {
-            id,
-            name: deviceMap[id] || id,
-            distanceKm: 0,
-            driveSec: 0,
-            idleSec: 0,
-            tripCount: 0,
-            activeDays: {}
-          };
-        }
-        const v = byVehicle[id];
-        v.distanceKm += (trip.distance || 0) / 1000;
-        v.driveSec += trip.drivingDuration?.ticks ? (trip.drivingDuration.ticks / 10000000) : 0;
-        v.idleSec += trip.idlingDuration?.ticks ? (trip.idlingDuration.ticks / 10000000) : 0;
-        v.tripCount += 1;
-        if (trip.start) v.activeDays[String(trip.start).substring(0, 10)] = true;
-      });
+    <!-- KPI row -->
+    <div class="kpi-row">
 
-      Object.keys(byVehicle).forEach((id) => {
-        const v = byVehicle[id];
-        v.idleHrs = v.idleSec / 3600;
-        v.driveHrs = v.driveSec / 3600;
-        v.totalHrs = v.idleHrs + v.driveHrs;
-        v.idlePct = pct(v.idleHrs, v.totalHrs);
-        v.activeDayCount = Object.keys(v.activeDays).length || 1;
-        v.avgDailyKm = v.distanceKm / v.activeDayCount;
-        v.tripsPerDay = v.tripCount / v.activeDayCount;
+      <div class="kpi-card green">
+        <div class="kpi-label">🌍 CO₂ Emitted</div>
+        <div class="kpi-value" id="kpi-co2">—<span class="unit">t</span></div>
+        <div class="kpi-desc">Estimated from real trip distances</div>
+        <div class="kpi-insight" id="kpi-co2-insight"></div>
+      </div>
 
-        v.fuelDrive = v.distanceKm * FUEL_PER_KM;
-        v.fuelIdle = v.idleHrs * IDLE_FUEL_L_HR;
-        v.totalFuel = v.fuelDrive + v.fuelIdle;
-        v.co2Total = v.totalFuel * CO2_PER_LITRE;
-        v.co2Idle = v.fuelIdle * CO2_PER_LITRE;
+      <div class="kpi-card orange">
+        <div class="kpi-label">⏱️ Idle Fuel Wasted</div>
+        <div class="kpi-value" id="kpi-idle">—<span class="unit">L</span></div>
+        <div class="kpi-desc">Engine on, not moving</div>
+        <div class="kpi-insight" id="kpi-idle-insight"></div>
+      </div>
 
-        const scoreKm = v.avgDailyKm <= 200 ? Math.max(0, (200 - v.avgDailyKm) / 200 * 40) : 0;
-        const scoreIdle = Math.min(v.idlePct / 100 * 30, 30);
-        const scoreTrips = v.tripsPerDay >= 2 ? 20 : v.tripsPerDay * 10;
-        v.evScore = Math.min(100, Math.round(scoreKm + scoreIdle + scoreTrips + 10));
-      });
+      <div class="kpi-card blue">
+        <div class="kpi-label">⚡ EV-Ready Vehicles</div>
+        <div class="kpi-value" id="kpi-ev">—<span class="unit"></span></div>
+        <div class="kpi-desc">Score ≥ 70: range fits, high idle, short trips</div>
+        <div class="kpi-insight" id="kpi-ev-insight"></div>
+      </div>
 
-      return Object.values(byVehicle).filter((v) => v.tripCount > 0);
-    }
+    </div>
 
-    function geotabCall(api, method, params) {
-      return new Promise((resolve, reject) => api.call(method, params, resolve, reject));
-    }
+    <!-- Idle table -->
+    <div class="section-card">
+      <div class="section-header">
+        <span class="section-title">Idle Time — Top 10 Worst Offenders</span>
+        <span class="pill pill-orange" id="idle-fleet-pct"></span>
+      </div>
+      <div class="section-body">
+        <div class="highlight-box" id="idle-highlight"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Vehicle</th>
+              <th>Idle Time</th>
+              <th>% of Engine-On</th>
+              <th>Fuel Wasted</th>
+              <th>CO₂ Wasted</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="idle-tbody"></tbody>
+        </table>
+      </div>
+    </div>
 
-    function App() {
-      const [api, setApi] = useState(null);
-      const [db, setDb] = useState('Connecting...');
-      const [loading, setLoading] = useState(true);
-      const [error, setError] = useState('');
-      const [tab, setTab] = useState('overview');
-      const [trips, setTrips] = useState([]);
-      const [deviceMap, setDeviceMap] = useState({});
-      const [aceInput, setAceInput] = useState('');
-      const [aceLoading, setAceLoading] = useState(false);
-      const [aceResult, setAceResult] = useState(null);
+    <!-- EV readiness table -->
+    <div class="section-card">
+      <div class="section-header">
+        <span class="section-title">EV Readiness — Top Candidates</span>
+        <span class="pill pill-blue" id="ev-saving-pill"></span>
+      </div>
+      <div class="section-body">
+        <div class="highlight-box" id="ev-highlight"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Vehicle</th>
+              <th>Avg Daily km</th>
+              <th>Trips / Day</th>
+              <th>Idle %</th>
+              <th>EV Score</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="ev-tbody"></tbody>
+        </table>
+      </div>
+    </div>
 
-      useEffect(() => {
-        window.__setGeotabApi = (apiRef, session) => {
-          setApi(apiRef);
-          setDb(session?.database || 'Fleet');
-        };
-      }, []);
+  </div><!-- /content -->
 
-      useEffect(() => {
-        if (!api) return;
-        let active = true;
-        (async () => {
-          try {
-            setLoading(true);
-            const devices = await geotabCall(api, 'Get', { typeName: 'Device' });
-            const map = {};
-            devices.forEach((d) => { map[d.id] = d.name; });
-            const now = new Date();
-            const from = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
-            const tripRows = await geotabCall(api, 'Get', {
-              typeName: 'Trip',
-              search: { fromDate: from.toISOString(), toDate: now.toISOString() },
-              resultsLimit: 50000
-            });
-            if (!active) return;
-            setDeviceMap(map);
-            setTrips(tripRows || []);
-            setError('');
-          } catch (e) {
-            if (active) setError(`Failed to load fleet data: ${e?.message || e}`);
-          } finally {
-            if (active) setLoading(false);
-          }
-        })();
-        return () => { active = false; };
-      }, [api]);
+<script>
+"use strict";
 
-      const vehicles = useMemo(() => aggregateByVehicle(trips, deviceMap), [trips, deviceMap]);
-      const overview = useMemo(() => {
-        const totalCO2 = vehicles.reduce((s, v) => s + v.co2Total, 0) / 1000;
-        const totalFuel = vehicles.reduce((s, v) => s + v.totalFuel, 0);
-        const totalIdleH = vehicles.reduce((s, v) => s + v.idleHrs, 0);
-        const totalKm = vehicles.reduce((s, v) => s + v.distanceKm, 0);
-        const avgEff = totalKm > 0 ? (totalFuel / totalKm * 100) : 0;
-        return { totalCO2, totalFuel, totalIdleH, totalKm, avgEff };
-      }, [vehicles]);
+// ── Constants ─────────────────────────────────────────────────
+var CO2_KG_PER_LITRE = 2.31;   // gasoline
+var FUEL_L_PER_KM    = 0.10;   // 10 L / 100 km fleet avg
+var IDLE_FUEL_L_HR   = 0.8;    // litres / hour idling
+var DAYS             = 7;
 
-      async function sendAce() {
-        if (!api || !aceInput.trim() || aceLoading) return;
-        setAceLoading(true);
-        setAceResult(null);
-        try {
-          const createRes = await geotabCall(api, 'GetAceResults', {
-            serviceName: 'dna-planet-orchestration',
-            functionName: 'create-chat',
-            customerData: true,
-            functionParameters: {}
-          });
-          const c = createRes?.apiResult?.results?.[0] || {};
-          const chatId = c.chat_id;
-          if (!chatId) throw new Error('No chat_id from Ace');
+// ── Helpers ───────────────────────────────────────────────────
+function fmt(n, dec) {
+  if (n == null || isNaN(n)) return "—";
+  return Number(n).toLocaleString(undefined, { maximumFractionDigits: dec != null ? dec : 0 });
+}
+function showError(msg) {
+  var el = document.getElementById("error-banner");
+  el.textContent = "⚠️ " + msg;
+  el.style.display = "block";
+  document.getElementById("loading").style.display = "none";
+}
+function evScore(avgDailyKm, idlePct, tripsPerDay) {
+  var s = 0;
+  // Range fit: ≤150 km = full 40pts, linear above
+  s += Math.max(0, Math.min(40, (150 - avgDailyKm) / 150 * 40));
+  // High idle = EV shines (no idle waste)
+  s += Math.min(30, idlePct / 100 * 30);
+  // Multiple short trips per day
+  s += Math.min(20, tripsPerDay * 7);
+  // Base
+  s += 10;
+  return Math.min(100, Math.round(s));
+}
+function evVerdict(score) {
+  if (score >= 70) return ["EV Ready", "pill-green"];
+  if (score >= 50) return ["Good Fit", "pill-blue"];
+  if (score >= 35) return ["Consider", "pill-orange"];
+  return ["Not Yet", "pill-red"];
+}
+function progressBar(pct, color) {
+  return '<div class="progress-wrap">' +
+    '<div class="progress-bg"><div class="progress-fill" style="width:' +
+    Math.min(pct, 100) + '%;background:' + color + '"></div></div>' +
+    '<span class="progress-label">' + fmt(pct, 0) + '%</span></div>';
+}
 
-          const promptRes = await geotabCall(api, 'GetAceResults', {
-            serviceName: 'dna-planet-orchestration',
-            functionName: 'send-prompt',
-            customerData: true,
-            functionParameters: { chat_id: chatId, prompt: aceInput.trim() }
-          });
-          const p = promptRes?.apiResult?.results?.[0] || {};
-          const msgId = p.message_group_id || p.message_group?.id;
-          if (!msgId) throw new Error('No message_group_id from Ace');
+// ── Main ──────────────────────────────────────────────────────
+geotab.addin["greenfleet-iq"] = function () {
+  var apiRef;
 
-          for (let i = 0; i < 30; i++) {
-            await new Promise((r) => setTimeout(r, 5000));
-            const pollRes = await geotabCall(api, 'GetAceResults', {
-              serviceName: 'dna-planet-orchestration',
-              functionName: 'get-message-group',
-              customerData: true,
-              functionParameters: { chat_id: chatId, message_group_id: msgId }
-            });
-            const r = pollRes?.apiResult?.results?.[0] || {};
-            const status = r.message_group?.status?.status;
-            if (status === 'DONE') {
-              const messages = r.message_group?.messages || {};
-              const first = messages[Object.keys(messages)[0]] || {};
-              setAceResult({
-                reasoning: first.reasoning || '',
-                preview: first.preview_array || []
-              });
-              setAceLoading(false);
-              return;
-            }
-            if (status === 'FAILED') throw new Error('Ace query failed');
-          }
-          throw new Error('Ace timed out');
-        } catch (e) {
-          setAceResult({ error: e?.message || String(e) });
-        } finally {
-          setAceLoading(false);
-        }
-      }
+  function run(api) {
+    apiRef = api;
+    var now   = new Date();
+    var from  = new Date(now - DAYS * 24 * 3600 * 1000);
 
-      const sortedIdle = [...vehicles].sort((a, b) => b.idlePct - a.idlePct);
-      const sortedEV = [...vehicles].sort((a, b) => b.evScore - a.evScore);
-      const ready = sortedEV.filter((v) => v.evScore >= 75).length;
+    // Parallel: devices + trips
+    api.call("Get", { typeName: "Device" }, function (devices) {
 
-      return h(FeedbackProvider, null,
-        h('div', null,
-          h('div', { className: 'header' },
-            h('div', null,
-              h('h2', { style: { margin: 0 } }, 'GreenFleet IQ'),
-              h('div', { style: { color: 'var(--zenith-neutral-600,#605e5c)', fontSize: '12px' } }, `${db} · Last 30 days`)
-            ),
-            h(Button, { variant: 'secondary', onClick: () => window.location.reload() }, 'Refresh')
-          ),
+      var nameMap = {};
+      devices.forEach(function (d) { nameMap[d.id] = d.name; });
 
-          h('div', { className: 'tabs' },
-            ['overview', 'idle', 'ev', 'ai'].map((t) => h(Button, { key: t, variant: tab === t ? 'primary' : 'tertiary', onClick: () => setTab(t) }, t.toUpperCase()))
-          ),
-
-          error ? h(Alert, { variant: 'error' }, error) : null,
-          loading ? h('div', { style: { marginTop: '24px' } }, h(Waiting, { size: 'large' })) : null,
-
-          !loading && h('div', { className: `section ${tab === 'overview' ? 'active' : ''}` },
-            h('div', { className: 'grid-5' },
-              h('div', { className: 'kpi-card' }, h('div', { className: 'kpi-label' }, 'Total CO₂'), h('div', { className: 'kpi-value' }, `${fmt(overview.totalCO2, 1)} t`), h('div', { className: 'kpi-sub' }, 'Past 30 days')),
-              h('div', { className: 'kpi-card' }, h('div', { className: 'kpi-label' }, 'Fuel Used'), h('div', { className: 'kpi-value' }, `${fmt(overview.totalFuel / 1000, 1)} kL`), h('div', { className: 'kpi-sub' }, 'Estimated from distance')),
-              h('div', { className: 'kpi-card' }, h('div', { className: 'kpi-label' }, 'Distance'), h('div', { className: 'kpi-value' }, `${fmt(overview.totalKm / 1000)} K km`), h('div', { className: 'kpi-sub' }, 'All vehicles')),
-              h('div', { className: 'kpi-card' }, h('div', { className: 'kpi-label' }, 'Fleet Avg'), h('div', { className: 'kpi-value' }, `${fmt(overview.avgEff, 1)} L/100km`), h('div', { className: 'kpi-sub' }, 'Fuel efficiency')),
-              h('div', { className: 'kpi-card' }, h('div', { className: 'kpi-label' }, 'Idle Hours'), h('div', { className: 'kpi-value' }, `${fmt(overview.totalIdleH)} h`), h('div', { className: 'kpi-sub' }, 'Engine on, not moving'))
-            )
-          ),
-
-          !loading && h('div', { className: `section ${tab === 'idle' ? 'active' : ''}` },
-            h('div', { className: 'card' },
-              h('h3', null, 'Idle Analyzer'),
-              h('div', { className: 'table-wrap' },
-                h('table', null,
-                  h('thead', null, h('tr', null,
-                    h('th', null, 'Vehicle'), h('th', null, 'Idle hrs'), h('th', null, 'Idle %'), h('th', null, 'Wasted Fuel (L)'), h('th', null, 'CO Idle (kg)'), h('th', null, 'Status')
-                  )),
-                  h('tbody', null, sortedIdle.map((v) => {
-                    const status = v.idlePct > 25 ? ['Critical', 'badge-bad'] : v.idlePct > 15 ? ['High', 'badge-mid'] : ['Normal', 'badge-good'];
-                    return h('tr', { key: v.id },
-                      h('td', null, v.name),
-                      h('td', null, fmt(v.idleHrs, 1)),
-                      h('td', null, `${fmt(v.idlePct, 1)}%`),
-                      h('td', null, fmt(v.fuelIdle, 0)),
-                      h('td', null, fmt(v.co2Idle, 0)),
-                      h('td', null, h('span', { className: `badge ${status[1]}` }, status[0]))
-                    );
-                  }))
-                )
-              )
-            )
-          ),
-
-          !loading && h('div', { className: `section ${tab === 'ev' ? 'active' : ''}` },
-            h('div', { className: 'grid-5' },
-              h('div', { className: 'kpi-card' }, h('div', { className: 'kpi-label' }, 'EV Ready'), h('div', { className: 'kpi-value' }, String(ready)), h('div', { className: 'kpi-sub' }, 'Score ≥ 75'))
-            ),
-            h('div', { className: 'card' },
-              h('h3', null, 'EV Readiness'),
-              h('div', { className: 'table-wrap' },
-                h('table', null,
-                  h('thead', null, h('tr', null,
-                    h('th', null, 'Vehicle'), h('th', null, 'Avg Daily km'), h('th', null, 'Idle %'), h('th', null, 'Trips/Day'), h('th', null, 'EV Score')
-                  )),
-                  h('tbody', null, sortedEV.map((v) => h('tr', { key: v.id },
-                    h('td', null, v.name),
-                    h('td', null, fmt(v.avgDailyKm, 0)),
-                    h('td', null, `${fmt(v.idlePct, 1)}%`),
-                    h('td', null, fmt(v.tripsPerDay, 1)),
-                    h('td', null, fmt(v.evScore, 0))
-                  )))
-                )
-              )
-            )
-          ),
-
-          !loading && h('div', { className: `section ${tab === 'ai' ? 'active' : ''}` },
-            h('div', { className: 'card' },
-              h('h3', null, 'Geotab Ace Insights'),
-              h('div', { className: 'quick' },
-                h(Button, { variant: 'tertiary', onClick: () => setAceInput('Which vehicles have the highest idle time as % of total engine-on time last 30 days? Return columns: device_name, idle_pct, idle_hours') }, 'Top idlers'),
-                h(Button, { variant: 'tertiary', onClick: () => setAceInput('Which vehicles drove the most distance last 30 days? Return columns: device_name, total_km, trip_count') }, 'Top distance')
-              ),
-              h('div', { className: 'ace-row' },
-                h('div', { style: { flex: 1 } }, h(TextInput, { label: 'Ask Ace', value: aceInput, onChange: (e) => setAceInput(e.target.value) })),
-                h(Button, { variant: 'primary', disabled: aceLoading, onClick: sendAce }, aceLoading ? 'Analyzing...' : 'Ask AI')
-              ),
-              aceLoading ? h('div', { style: { marginTop: 12 } }, h(Waiting, { size: 'medium' })) : null,
-              aceResult?.error ? h('div', { style: { marginTop: 12 } }, h(Alert, { variant: 'error' }, aceResult.error)) : null,
-              aceResult?.reasoning ? h('p', { style: { color: 'var(--zenith-neutral-700,#484644)' } }, aceResult.reasoning) : null,
-              aceResult?.preview?.length ? h('div', { className: 'table-wrap' }, h('table', null,
-                h('tbody', null, aceResult.preview.map((row, idx) => h('tr', { key: idx },
-                  Object.values(row).map((v, i) => h('td', { key: i }, String(v)))
-                )))
-              )) : null
-            )
-          )
-        )
-      );
-    }
-
-    createRoot(document.getElementById('app')).render(h(App));
-  </script>
-
-  <script>
-    geotab.addin['greenfleet-iq'] = function() {
-      return {
-        initialize: function(api, state, callback) {
-          api.getSession(function(session) {
-            if (window.__setGeotabApi) {
-              window.__setGeotabApi(api, session);
-            } else {
-              setTimeout(function() { window.__setGeotabApi && window.__setGeotabApi(api, session); }, 500);
-            }
-          });
-          callback();
+      api.call("Get", {
+        typeName: "Trip",
+        search: {
+          fromDate: from.toISOString(),
+          toDate:   now.toISOString()
         },
-        focus: function() {},
-        blur: function() {}
-      };
-    };
-  </script>
+        resultsLimit: 50000
+      }, function (trips) {
+
+        render(trips, nameMap);
+
+      }, function (err) { showError("Failed to load trips: " + err); });
+
+    }, function (err) { showError("Failed to load devices: " + err); });
+  }
+
+  function render(trips, nameMap) {
+    // ── Aggregate by vehicle ───────────────────────────────
+    var byVehicle = {};
+
+    trips.forEach(function (t) {
+      var id = t.device && t.device.id;
+      if (!id) return;
+      if (!byVehicle[id]) {
+        byVehicle[id] = {
+          id: id,
+          name: nameMap[id] || id,
+          distKm: 0, tripCount: 0,
+          driveSec: 0, idleSec: 0,
+          days: {}
+        };
+      }
+      var v = byVehicle[id];
+      // Trip.distance is in METERS
+      v.distKm    += (t.distance || 0) / 1000;
+      v.tripCount += 1;
+      // Duration fields: .ticks = 100-nanosecond intervals
+      if (t.drivingDuration && t.drivingDuration.ticks)
+        v.driveSec += t.drivingDuration.ticks / 1e7;
+      if (t.idlingDuration && t.idlingDuration.ticks)
+        v.idleSec  += t.idlingDuration.ticks / 1e7;
+      if (t.start) v.days[t.start.substring(0, 10)] = 1;
+    });
+
+    var vehicles = Object.values(byVehicle).filter(function (v) {
+      return v.tripCount > 0;
+    });
+
+    // ── Derived metrics ────────────────────────────────────
+    vehicles.forEach(function (v) {
+      v.idleHrs     = v.idleSec / 3600;
+      v.driveHrs    = v.driveSec / 3600;
+      v.totalHrs    = v.idleHrs + v.driveHrs;
+      v.idlePct     = v.totalHrs > 0 ? v.idleSec / (v.driveSec + v.idleSec) * 100 : 0;
+      v.activeDays  = Math.max(Object.keys(v.days).length, 1);
+      v.avgDailyKm  = v.distKm / v.activeDays;
+      v.tripsPerDay = v.tripCount / v.activeDays;
+      v.idleFuelL   = v.idleHrs * IDLE_FUEL_L_HR;
+      v.driveFuelL  = v.distKm  * FUEL_L_PER_KM;
+      v.totalFuelL  = v.driveFuelL + v.idleFuelL;
+      v.co2Kg       = v.totalFuelL * CO2_KG_PER_LITRE;
+      v.co2IdleKg   = v.idleFuelL  * CO2_KG_PER_LITRE;
+      v.evScore     = evScore(v.avgDailyKm, v.idlePct, v.tripsPerDay);
+    });
+
+    // ── Fleet totals ───────────────────────────────────────
+    var totalCO2Kg    = vehicles.reduce(function (s, v) { return s + v.co2Kg; }, 0);
+    var totalIdleFuel = vehicles.reduce(function (s, v) { return s + v.idleFuelL; }, 0);
+    var totalFuel     = vehicles.reduce(function (s, v) { return s + v.totalFuelL; }, 0);
+    var fleetIdlePct  = totalFuel > 0 ? totalIdleFuel / totalFuel * 100 : 0;
+    var evReady       = vehicles.filter(function (v) { return v.evScore >= 70; });
+
+    // ── KPI cards ──────────────────────────────────────────
+    var co2T = totalCO2Kg / 1000;
+    document.getElementById("kpi-co2").innerHTML =
+      fmt(co2T, co2T < 10 ? 1 : 0) + '<span class="unit"> t</span>';
+    document.getElementById("kpi-co2-insight").innerHTML =
+      'Equiv. <strong>' + fmt(co2T * 1000 / 0.12, 0) + ' km</strong> driven by avg car';
+
+    document.getElementById("kpi-idle").innerHTML =
+      fmt(totalIdleFuel, 0) + '<span class="unit"> L</span>';
+    document.getElementById("kpi-idle-insight").innerHTML =
+      '<strong>' + fmt(fleetIdlePct, 1) + '%</strong> of all fuel burned — engine on, going nowhere';
+
+    var evCount = evReady.length;
+    document.getElementById("kpi-ev").innerHTML =
+      evCount + '<span class="unit"> / ' + vehicles.length + '</span>';
+    var potentialCO2T = evReady.reduce(function (s, v) { return s + v.co2Kg; }, 0) / 1000 * 12 * 0.85;
+    document.getElementById("kpi-ev-insight").innerHTML =
+      'Could avoid <strong>' + fmt(potentialCO2T, 0) + ' t CO₂/year</strong> if switched to EV';
+
+    // ── Idle table ─────────────────────────────────────────
+    document.getElementById("idle-fleet-pct").textContent =
+      fmt(fleetIdlePct, 1) + "% fleet idle";
+
+    var worstIdle = vehicles.slice().sort(function (a, b) { return b.idleHrs - a.idleHrs; });
+    var topIdle   = worstIdle[0];
+    document.getElementById("idle-highlight").innerHTML =
+      '<span class="icon">💡</span>' +
+      'Eliminating idle on the <strong>top 3 offenders</strong> alone would save ' +
+      '<strong>' + fmt(worstIdle.slice(0,3).reduce(function(s,v){return s+v.idleFuelL;},0), 0) +
+      ' L of fuel</strong> and <strong>' +
+      fmt(worstIdle.slice(0,3).reduce(function(s,v){return s+v.co2IdleKg;},0)/1000, 2) +
+      ' t CO₂</strong> this week.';
+
+    var idleTop10 = worstIdle.slice(0, 10);
+    document.getElementById("idle-tbody").innerHTML = idleTop10.map(function (v, i) {
+      var pctColor = v.idlePct > 25 ? "#D13438" : v.idlePct > 15 ? "#FFB900" : "#107C10";
+      var statusCls = v.idlePct > 25 ? "pill-red" : v.idlePct > 15 ? "pill-orange" : "pill-green";
+      var statusTxt = v.idlePct > 25 ? "Critical" : v.idlePct > 15 ? "High" : "Normal";
+      return "<tr>" +
+        "<td><strong>" + v.name + "</strong></td>" +
+        "<td>" + fmt(v.idleHrs, 1) + " hrs</td>" +
+        "<td class='idle-bar-cell'>" + progressBar(v.idlePct, pctColor) + "</td>" +
+        "<td>" + fmt(v.idleFuelL, 0) + " L</td>" +
+        "<td>" + fmt(v.co2IdleKg, 0) + " kg</td>" +
+        "<td><span class='pill " + statusCls + "'>" + statusTxt + "</span></td>" +
+        "</tr>";
+    }).join("");
+
+    // ── EV table ───────────────────────────────────────────
+    var annualSavingT = evReady.reduce(function (s, v) { return s + v.co2Kg; }, 0) / 1000 * 12 * 0.85;
+    document.getElementById("ev-saving-pill").textContent =
+      "~" + fmt(annualSavingT, 0) + " t CO₂ avoided/yr if switched";
+
+    document.getElementById("ev-highlight").innerHTML =
+      '<span class="icon">⚡</span>' +
+      '<strong>' + evCount + ' vehicles</strong> are strong EV candidates. ' +
+      'They average <strong>' +
+      fmt(evReady.reduce(function(s,v){return s+v.avgDailyKm;},0)/(evReady.length||1), 0) +
+      ' km/day</strong> — well within EV range. ' +
+      'High idle means they waste most fuel at standstill: exactly where EVs excel.';
+
+    var evSorted = vehicles.slice().sort(function (a, b) { return b.evScore - a.evScore; }).slice(0, 10);
+    document.getElementById("ev-tbody").innerHTML = evSorted.map(function (v) {
+      var verdict = evVerdict(v.evScore);
+      var scoreColor = v.evScore >= 70 ? "#107C10" : v.evScore >= 50 ? "#0078D4" : v.evScore >= 35 ? "#7A4F00" : "#D13438";
+      return "<tr>" +
+        "<td><strong>" + v.name + "</strong></td>" +
+        "<td>" + fmt(v.avgDailyKm, 0) + " km</td>" +
+        "<td>" + fmt(v.tripsPerDay, 1) + "</td>" +
+        "<td>" + fmt(v.idlePct, 1) + "%</td>" +
+        "<td>" +
+          '<div class="progress-wrap">' +
+          '<div class="progress-bg"><div class="progress-fill" style="width:' + v.evScore + '%;background:' + scoreColor + '"></div></div>' +
+          '<span class="progress-label" style="color:' + scoreColor + ';font-weight:600">' + v.evScore + '</span>' +
+          '</div>' +
+        "</td>" +
+        "<td><span class='pill " + verdict[1] + "'>" + verdict[0] + "</span></td>" +
+        "</tr>";
+    }).join("");
+
+    // ── Show content ───────────────────────────────────────
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("content").style.display = "block";
+  }
+
+  return {
+    initialize: function (api, state, callback) {
+      api.getSession(function (session) {
+        document.getElementById("db-label").textContent = session.database || "—";
+      });
+      run(api);
+      callback();
+    },
+    focus: function (api, state) {},
+    blur:  function (api, state) {}
+  };
+};
+</script>
 </body>
 </html>

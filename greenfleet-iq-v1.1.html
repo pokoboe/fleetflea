@@ -14,7 +14,7 @@
     </div>
     <div class="header-right">
       <span class="db-label" id="db-label">Loading...</span>
-      <span class="version-label">v1.2 · FleetFlea</span>
+      <span class="version-label">v1.3 · FleetFlea</span>
     </div>
   </div>
 
@@ -98,13 +98,13 @@
     </div>
 
     <div class="footer">
-      GreenFleet IQ v1.2 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
+      GreenFleet IQ v1.3 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
     </div>
 
   </div>
 
 <script>
-(function() {  // IIFE to prevent redeclaration issues
+(function() {
 "use strict";
 
 // ── Constants ─────────────────────────────────────────────────
@@ -132,14 +132,28 @@ function showError(msg) {
 function getEmissionFactor(device) {
   const type = (device?.engineType || "").toLowerCase();
   if (type.includes("diesel")) return CO2_KG_PER_L_DIESEL;
-  return CO2_KG_PER_L_GASOLINE; // default to gasoline
+  return CO2_KG_PER_L_GASOLINE;
 }
 
 function evScore(avgKm, idlePct, tripsDay) {
-  let s = 10;
-  s += Math.max(0, Math.min(42, (180 - avgKm) / 180 * 42));
-  s += Math.min(28, idlePct * 0.28);
-  s += Math.min(20, tripsDay * 6.5);
+  let s = 10;  // base
+
+  // Range fit: full points ≤ 250 km, gradual decay to zero at 400 km
+  let rangePts = 42 * Math.max(0, 1 - Math.max(0, avgKm - 250) / 150);
+  s += rangePts;
+
+  // Idle benefit — slightly stronger weight
+  s += Math.min(32, idlePct * 0.32);
+
+  // Short-trip / high utilization
+  s += Math.min(25, tripsDay * 7);
+
+  // High-utilization bonus: reward heavy-duty patterns with many stops + idle
+  // (the pattern that was previously punished by strict range limit)
+  if (avgKm > 180 && tripsDay > 5 && idlePct > 10) {
+    s += 15;  // meaningful bonus for high-activity + high-idle vehicles
+  }
+
   return Math.min(100, Math.round(s));
 }
 
@@ -238,13 +252,11 @@ geotab.addin["greenfleet-iq"] = function () {
       v.driveSec += parseDur(t.drivingDuration);
       v.idleSec  += parseDur(t.idlingDuration);
 
-      // Try to use real fuel consumption if present in Trip
       if (t.fuelUsed?.value && !isNaN(t.fuelUsed.value)) {
         v.fuelUsedL += Number(t.fuelUsed.value);
       }
     });
 
-    // Count harsh events
     const harshKeywords = ["HarshAcceleration", "HarshBrake", "HarshCornering"];
     exceptions.forEach(e => {
       const vid = e.device?.id;
@@ -266,7 +278,6 @@ geotab.addin["greenfleet-iq"] = function () {
       v.avgDailyKm = v.distKm / v.activeDays;
       v.tripsDay   = v.trips / v.activeDays;
 
-      // Fuel logic: prefer real reported fuel, fallback to estimate
       let drivingFuelL;
       if (v.fuelUsedL > 0.1) {
         drivingFuelL = v.fuelUsedL;
@@ -279,13 +290,11 @@ geotab.addin["greenfleet-iq"] = function () {
       v.idleFuel   = v.idleHrs * IDLE_L_PER_HOUR;
       v.baseFuel   = drivingFuelL + v.idleFuel;
 
-      // Harsh driving penalty (only applied to driving portion)
       const harshPer100 = v.distKm > 0 ? (v.harshCount / v.distKm) * 100 : 0;
       v.harshPenaltyPct = Math.min(MAX_PENALTY_PCT, Math.max(0, (harshPer100 - HARSH_THRESHOLD_PER_100KM) * 0.05)) * 100;
       const penalizedDriving = drivingFuelL * (1 + v.harshPenaltyPct / 100);
       v.totalFuel  = penalizedDriving + v.idleFuel;
 
-      // CO₂ — use correct factor per vehicle
       const co2Factor = getEmissionFactor(deviceMap[v.id]);
       v.co2Kg      = v.totalFuel * co2Factor;
       v.co2IdleKg  = v.idleFuel * co2Factor;
@@ -293,7 +302,6 @@ geotab.addin["greenfleet-iq"] = function () {
       v.evScore    = evScore(v.avgDailyKm, v.idlePct, v.tripsDay);
     });
 
-    // ── Fleet totals ───────────────────────────────────────
     const totalCO2     = vehicles.reduce((s,v)=>s+v.co2Kg,     0) / 1000;
     const totalIdleL   = vehicles.reduce((s,v)=>s+v.idleFuel,  0);
     const totalFuel    = vehicles.reduce((s,v)=>s+v.totalFuel, 0);
@@ -301,7 +309,6 @@ geotab.addin["greenfleet-iq"] = function () {
     const evReady      = vehicles.filter(v => v.evScore >= 72);
     const evCount      = evReady.length;
 
-    // ── KPIs ───────────────────────────────────────────────
     document.getElementById("kpi-co2").innerHTML = fmt(totalCO2, totalCO2<10?1:0) + '<span class="unit"> t</span>';
     document.getElementById("kpi-co2-insight").innerHTML =
       `≈ <strong>${fmt(totalCO2 * 1000 / 0.115, 0)}</strong> km driven by avg passenger car`;
@@ -315,7 +322,6 @@ geotab.addin["greenfleet-iq"] = function () {
     document.getElementById("kpi-ev-insight").innerHTML =
       `Switching could avoid <strong>${fmt(potYearCO2,0)} t CO₂/year</strong>`;
 
-    // ── Idle table ─────────────────────────────────────────
     document.getElementById("idle-fleet-pct").textContent = fmt(fleetIdlePct,1) + "% fleet idle";
 
     const worstIdle = [...vehicles].sort((a,b)=>b.idleHrs - a.idleHrs);
@@ -338,7 +344,6 @@ geotab.addin["greenfleet-iq"] = function () {
       </tr>`;
     }).join("");
 
-    // ── EV table with Harsh penalty column ─────────────────
     document.getElementById("ev-saving-pill").textContent =
       `~${fmt(potYearCO2,0)} t CO₂/yr avoided if switched`;
 

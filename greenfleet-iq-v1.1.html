@@ -106,7 +106,7 @@
     </div>
 
     <div class="footer">
-      GreenFleet IQ v1.7 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
+      GreenFleet IQ v1.8 • FleetFlea • Data: MyGeotab Trip API • Feb 2026
     </div>
 
   </div>
@@ -114,11 +114,10 @@
   <!-- Modal -->
   <div id="vehicle-modal" class="modal" style="display:none">
     <div class="modal-content">
-      <span class="close" id="modal-close">×</span>
-      <h2 id="modal-vehicle-name"></h2>
-      <canvas id="chart-engine-on" height="130"></canvas>
-      <canvas id="chart-idle-fuel-pct" height="130"></canvas>
-      <canvas id="chart-fuel-wasted" height="130"></canvas>
+      <button class="modal-close-btn" id="modal-close">×</button>
+      <div class="modal-vehicle-title" id="modal-vehicle-name"></div>
+      <div class="modal-subtitle">Daily idle breakdown — trends over selected period</div>
+      <div class="chart-wrap"><canvas id="chart-combined"></canvas></div>
     </div>
   </div>
 
@@ -133,8 +132,6 @@ const FUEL_L_PER_100KM      = 10.0;
 const IDLE_L_PER_HOUR       = 0.80;
 const RESULTS_LIMIT         = 50000;
 
-const HARSH_THRESHOLD_PER_100KM = 4;
-const MAX_PENALTY_PCT           = 0.25;
 
 let currentCharts = [];
 
@@ -209,21 +206,16 @@ geotab.addin["greenfleet-iq"] = function () {
         resultsLimit: RESULTS_LIMIT
       }, trips => {
 
-        api.call("Get", {
-          typeName: "ExceptionEvent",
-          search: { fromDate: from.toISOString(), toDate: now.toISOString() },
-          resultsLimit: 15000
-        }, exceptions => render(trips, exceptions, nameMap, devices), err => {
-          console.warn("ExceptionEvent failed — no harsh penalty", err);
-          render(trips, [], nameMap, devices);
-        });
+        // ExceptionEvent removed: rule is a reference object (id only),
+        // harsh penalty lookup needs a separate Rule fetch — not worth the latency.
+        render(trips, nameMap, devices);
 
       }, err => showError("Trips failed: " + err));
 
     }, err => showError("Devices failed: " + err));
   }
 
-  function render(trips, exceptions, nameMap, devices) {
+  function render(trips, nameMap, devices) {
     const deviceMap = {};
     devices.forEach(d => deviceMap[d.id] = d);
 
@@ -244,7 +236,6 @@ geotab.addin["greenfleet-iq"] = function () {
           driveSec: 0, idleSec: 0,
           days: new Set(),
           fuelUsedL: 0,
-          harshCount: 0
         };
       }
       const v = byVehicle[id];
@@ -286,16 +277,6 @@ geotab.addin["greenfleet-iq"] = function () {
       dd.totalFuelL += drivingFuelL;
     });
 
-    const harshKeywords = ["HarshAcceleration", "HarshBrake", "HarshCornering"];
-    exceptions.forEach(e => {
-      const vid = e.device?.id;
-      if (!vid || !byVehicle[vid]) return;
-      const ruleName = (e.rule?.name || "").toLowerCase();
-      if (harshKeywords.some(kw => ruleName.includes(kw.toLowerCase()))) {
-        byVehicle[vid].harshCount++;
-      }
-    });
-
     vehicles = Object.values(byVehicle).filter(v => v.trips > 0);
 
     vehicles.forEach(v => {
@@ -311,9 +292,7 @@ geotab.addin["greenfleet-iq"] = function () {
       v.idleFuel   = v.idleHrs * IDLE_L_PER_HOUR;
       v.totalFuel  = drivingFuelL + v.idleFuel;
 
-      const harshPer100 = v.distKm > 0 ? (v.harshCount / v.distKm) * 100 : 0;
-      v.harshPenaltyPct = Math.min(MAX_PENALTY_PCT, Math.max(0, (harshPer100 - HARSH_THRESHOLD_PER_100KM) * 0.05)) * 100;
-      v.totalFuel *= (1 + v.harshPenaltyPct / 100);
+      v.harshPenaltyPct = 0;
 
       const co2Factor = getEmissionFactor(deviceMap[v.id]);
       v.co2Kg      = v.totalFuel * co2Factor;
@@ -417,22 +396,92 @@ geotab.addin["greenfleet-iq"] = function () {
         currentCharts.forEach(c => c && c.destroy());
         currentCharts = [];
 
-        currentCharts.push(new Chart(document.getElementById('chart-engine-on'), {
+        currentCharts.push(new Chart(document.getElementById('chart-combined'), {
           type: 'line',
-          data: { labels: daysArr, datasets: [{ label: '% Engine-on', data: engineOnData, borderColor: '#FFB900', tension: 0.3 }] },
-          options: { responsive: true, plugins: { legend: { display: false } } }
-        }));
-
-        currentCharts.push(new Chart(document.getElementById('chart-idle-fuel-pct'), {
-          type: 'line',
-          data: { labels: daysArr, datasets: [{ label: 'Idle % of fuel', data: idleFuelPctData, borderColor: '#D13438', tension: 0.3 }] },
-          options: { responsive: true, plugins: { legend: { display: false } } }
-        }));
-
-        currentCharts.push(new Chart(document.getElementById('chart-fuel-wasted'), {
-          type: 'line',
-          data: { labels: daysArr, datasets: [{ label: 'Fuel wasted (L)', data: fuelWastedData, borderColor: '#107C10', tension: 0.3 }] },
-          options: { responsive: true, plugins: { legend: { display: false } } }
+          data: {
+            labels: daysArr,
+            datasets: [
+              {
+                label: 'Idle % of engine-on time',
+                data: engineOnData,
+                borderColor: '#FFB900',
+                backgroundColor: 'rgba(255,185,0,.10)',
+                fill: true, tension: 0.35,
+                pointRadius: 3, pointHoverRadius: 5,
+                yAxisID: 'yPct'
+              },
+              {
+                label: 'Idle fuel % of total fuel',
+                data: idleFuelPctData,
+                borderColor: '#D13438',
+                backgroundColor: 'rgba(209,52,56,.07)',
+                fill: true, tension: 0.35,
+                pointRadius: 3, pointHoverRadius: 5,
+                yAxisID: 'yPct'
+              },
+              {
+                label: 'Idle fuel wasted (L)',
+                data: fuelWastedData,
+                borderColor: '#0078D4',
+                backgroundColor: 'rgba(0,120,212,.07)',
+                fill: false, tension: 0.35,
+                pointRadius: 3, pointHoverRadius: 5,
+                borderDash: [5, 3],
+                yAxisID: 'yL'
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'bottom',
+                labels: {
+                  font: { family: "'Segoe UI', sans-serif", size: 12 },
+                  color: '#605E5C',
+                  padding: 20,
+                  usePointStyle: true,
+                  pointStyleWidth: 14
+                }
+              },
+              tooltip: {
+                backgroundColor: '#fff',
+                borderColor: '#C8C6C4',
+                borderWidth: 1,
+                titleColor: '#201F1E',
+                bodyColor: '#605E5C',
+                padding: 10,
+                callbacks: {
+                  label: ctx => {
+                    const v = ctx.parsed.y;
+                    if (ctx.datasetIndex < 2) return ` ${ctx.dataset.label}: ${v.toFixed(1)}%`;
+                    return ` ${ctx.dataset.label}: ${v.toFixed(1)} L`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: { color: '#EDEBE9' },
+                ticks: { font: { size: 11 }, color: '#605E5C', maxRotation: 45 }
+              },
+              yPct: {
+                type: 'linear', position: 'left',
+                grid: { color: '#EDEBE9' },
+                ticks: { font: { size: 11 }, color: '#605E5C', callback: v => v + '%' },
+                title: { display: true, text: '% of time / fuel', font: { size: 11 }, color: '#605E5C' }
+              },
+              yL: {
+                type: 'linear', position: 'right',
+                grid: { drawOnChartArea: false },
+                ticks: { font: { size: 11 }, color: '#0078D4', callback: v => v + ' L' },
+                title: { display: true, text: 'Litres wasted', font: { size: 11 }, color: '#0078D4' }
+              }
+            }
+          }
         }));
 
         document.getElementById('vehicle-modal').style.display = 'flex';
@@ -461,7 +510,7 @@ geotab.addin["greenfleet-iq"] = function () {
       run(api);
       callback();
     },
-    focus:   function (api, state) { run(api, days); },
+    focus:   function (api, state) { /* no-op — data loaded on initialize */ },
     blur:    () => {}
   };
 };

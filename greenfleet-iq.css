@@ -242,3 +242,27 @@ tr:hover td { background: #F3F2F1; }
   .kpi-row { grid-template-columns: 1fr; }
   th, td { padding-left: 16px; padding-right: 16px; }
 }
+
+#range-select {
+  font-size: 12px;
+  color: var(--z-neutral-600);
+  background: var(--z-white);
+  border: 1px solid var(--z-neutral-300);
+  border-radius: var(--z-radius);
+  padding: 4px 10px;
+  margin-right: 8px;
+  height: 28px;                /* чуть выше, как большинство элементов */
+  cursor: pointer;
+  appearance: none;             /* убираем дефолтную стрелку в некоторых браузерах */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23605E5C' d='M2 4l4 4 4-4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
+}
+
+/* hover и focus для интерактивности */
+#range-select:hover,
+#range-select:focus {
+  border-color: var(--z-blue);
+  outline: none;
+}

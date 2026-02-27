@@ -163,6 +163,18 @@ let currentCharts = [];
 // ── Helpers ───────────────────────────────────────────────────
 const fmt = (n, dec = 0) => isNaN(n) || n == null ? "—" : Number(n).toLocaleString(undefined, {maximumFractionDigits: dec});
 
+function parseDur(d) {
+  if (!d) return 0;
+  if (typeof d === "number") return d;
+  if (d.totalSeconds != null) return d.totalSeconds;
+  if (d.ticks != null) return d.ticks / 1e7;
+  if (typeof d === "string") {
+    const p = d.split(":");
+    if (p.length === 3) return (+p[0]) * 3600 + (+p[1]) * 60 + +p[2];
+  }
+  return 0;
+}
+
 function showError(msg) {
   const el = document.getElementById("error-banner");
   el.textContent = "⚠️ " + msg;
@@ -268,18 +280,6 @@ geotab.addin["greenfleet-iq"] = function () {
       v.distKm   += (t.distance || 0) * kmFactor;
       v.trips    += 1;
       v.days.add(t.start?.slice(0,10) || "");
-
-      const parseDur = d => {
-        if (!d) return 0;
-        if (typeof d === "number") return d;
-        if (d.totalSeconds != null) return d.totalSeconds;
-        if (d.ticks != null) return d.ticks / 1e7;
-        if (typeof d === "string") {
-          const p = d.split(":");
-          if (p.length === 3) return (+p[0])*3600 + (+p[1])*60 + +p[2];
-        }
-        return 0;
-      };
 
       v.driveSec += parseDur(t.drivingDuration);
       v.idleSec  += parseDur(t.idlingDuration);
@@ -520,7 +520,16 @@ geotab.addin["greenfleet-iq"] = function () {
     document.getElementById("loading").style.display = "none";
     document.getElementById("content").style.display = "block";
 
-    function updateMapMarkers(trips) {
+    allStops = trips;
+    if (map) updateMapMarkers(allStops);
+  }
+
+let map, longStopLayer, nightStopLayer, evLayer;
+let allStops = [];
+
+function updateMapMarkers(trips) {
+  if (!longStopLayer || !nightStopLayer) return;
+
   longStopLayer.clearLayers();
   nightStopLayer.clearLayers();
 
@@ -544,11 +553,6 @@ geotab.addin["greenfleet-iq"] = function () {
     }
   });
 }
-updateMapMarkers(trips);
-  }
-
-let map, longStopLayer, nightStopLayer, evLayer;
-let allStops = [];
 
 // Tab switching
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -573,6 +577,10 @@ function initMap() {
   nightStopLayer = L.layerGroup().addTo(map);
   evLayer = L.layerGroup().addTo(map);
 
+  if (allStops.length) {
+    updateMapMarkers(allStops);
+  }
+
   // Fetch EV chargers from NREL (free API - replace DEMO_KEY after registration at developer.nrel.gov)
   fetch('https://developer.nrel.gov/api/alt-fuel-stations/v1.json?api_key=DEMO_KEY&fuel_type=ELEC&state=FL&limit=200')
     .then(r => r.json())
@@ -585,6 +593,31 @@ function initMap() {
         }
       });
     });
+
+  document.getElementById('filter-long').addEventListener('click', () => {
+    map.addLayer(longStopLayer);
+    map.removeLayer(nightStopLayer);
+    map.removeLayer(evLayer);
+  });
+
+  document.getElementById('filter-night').addEventListener('click', () => {
+    map.removeLayer(longStopLayer);
+    map.addLayer(nightStopLayer);
+    map.removeLayer(evLayer);
+  });
+
+  document.getElementById('filter-ev').addEventListener('click', () => {
+    map.removeLayer(longStopLayer);
+    map.removeLayer(nightStopLayer);
+    map.addLayer(evLayer);
+  });
+
+  document.getElementById('filter-reset').addEventListener('click', () => {
+    map.addLayer(longStopLayer);
+    map.addLayer(nightStopLayer);
+    map.addLayer(evLayer);
+  });
+}
 
   return {
     initialize: function (api, state, callback) {

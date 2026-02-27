@@ -14,7 +14,7 @@
     </div>
     <div class="header-right">
       <span class="db-label" id="db-label">Loading...</span>
-      <span class="version-label">v1.3 · FleetFlea</span>
+      <span class="version-label">v1.4 · FleetFlea</span>
     </div>
   </div>
 
@@ -98,7 +98,7 @@
     </div>
 
     <div class="footer">
-      GreenFleet IQ v1.3 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
+      GreenFleet IQ v1.4 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
     </div>
 
   </div>
@@ -138,20 +138,19 @@ function getEmissionFactor(device) {
 function evScore(avgKm, idlePct, tripsDay) {
   let s = 10;  // base
 
-  // Range fit: full points ≤ 250 km, gradual decay to zero at 400 km
-  let rangePts = 42 * Math.max(0, 1 - Math.max(0, avgKm - 250) / 150);
+  // Range fit: full points ≤ 250 km, gradual decay to zero at 380 km
+  let rangePts = 42 * Math.max(0, 1 - Math.max(0, avgKm - 250) / 130);
   s += rangePts;
 
-  // Idle benefit — slightly stronger weight
-  s += Math.min(32, idlePct * 0.32);
+  // Idle benefit
+  s += Math.min(30, idlePct * 0.30);
 
   // Short-trip / high utilization
-  s += Math.min(25, tripsDay * 7);
+  s += Math.min(22, tripsDay * 6.5);
 
-  // High-utilization bonus: reward heavy-duty patterns with many stops + idle
-  // (the pattern that was previously punished by strict range limit)
-  if (avgKm > 180 && tripsDay > 5 && idlePct > 10) {
-    s += 15;  // meaningful bonus for high-activity + high-idle vehicles
+  // High-utilization bonus: reduced to +10, stricter conditions
+  if (avgKm > 180 && tripsDay > 6 && idlePct > 12) {
+    s += 10;  
   }
 
   return Math.min(100, Math.round(s));

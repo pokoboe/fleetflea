@@ -15,11 +15,11 @@
     <div class="header-right">
       <select id="range-select">
         <option value="1">Last day</option>
-        <option value="5">Last 5 days</option>
+        <option value="7">Last 7 days</option>
         <option value="30" selected>Last 30 days</option>
       </select>
       <span class="db-label" id="db-label">Loading...</span>
-      <span class="version-label">v1.5 · FleetFlea</span>
+      <span class="version-label">v1.6 · FleetFlea</span>
     </div>
   </div>
 
@@ -27,7 +27,7 @@
 
   <div class="loading" id="loading">
     <div class="spinner"></div>
-    <div id="loading-message">Fetching fleet data (trips + harsh events)...</div>
+    <div id="loading-message">Fetching fleet data for last 30 days (trips + harsh events)...</div>
   </div>
 
   <div id="content" style="display:none">
@@ -68,6 +68,7 @@
               <th>Vehicle</th>
               <th>Idle time</th>
               <th>% engine-on</th>
+              <th>Idle % of fuel</th>  <!-- новая колонка -->
               <th>Fuel wasted</th>
               <th>CO₂ wasted</th>
               <th>Status</th>
@@ -103,7 +104,7 @@
     </div>
 
     <div class="footer">
-      GreenFleet IQ v1.5 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
+      GreenFleet IQ v1.6 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
     </div>
 
   </div>
@@ -310,6 +311,9 @@ geotab.addin["greenfleet-iq"] = function () {
       v.co2Kg      = v.totalFuel * co2Factor;
       v.co2IdleKg  = v.idleFuel * co2Factor;
 
+      // New: idle fuel % for the vehicle
+      v.idleFuelPct = v.totalFuel > 0 ? v.idleFuel / v.totalFuel * 100 : 0;
+
       v.evScore    = evScore(v.avgDailyKm, v.idlePct, v.tripsDay);
     });
 
@@ -326,7 +330,7 @@ geotab.addin["greenfleet-iq"] = function () {
 
     document.getElementById("kpi-idle").innerHTML = fmt(totalIdleL, 0) + '<span class="unit"> L</span>';
     document.getElementById("kpi-idle-insight").innerHTML =
-      `<strong>${fmt(fleetIdlePct,1)}%</strong> of fuel burned while stationary`;
+      `<strong>${fmt(fleetIdlePct,1)}%</strong> of total fuel wasted on idling`;
 
     document.getElementById("kpi-ev").innerHTML = `${evCount}<span class="unit"> / ${vehicles.length}</span>`;
     const potYearCO2 = evReady.reduce((s,v)=>s+v.co2Kg,0) / 1000 * 12 * 0.84;
@@ -349,6 +353,7 @@ geotab.addin["greenfleet-iq"] = function () {
         <td><strong>${v.name}</strong></td>
         <td>${fmt(v.idleHrs,1)} h</td>
         <td class="idle-bar-cell">${progressBar(v.idlePct, color)}</td>
+        <td>${fmt(v.idleFuelPct,1)}%</td>  <!-- новая колонка -->
         <td>${fmt(v.idleFuel,0)} L</td>
         <td>${fmt(v.co2IdleKg,0)} kg</td>
         <td><span class="pill ${cls}">${txt}</span></td>

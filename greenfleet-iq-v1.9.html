@@ -521,6 +521,8 @@ geotab.addin["greenfleet-iq"] = function () {
     document.getElementById("content").style.display = "block";
 
     function updateMapMarkers(trips) {
+  if (!longStopLayer || !nightStopLayer) return;
+
   longStopLayer.clearLayers();
   nightStopLayer.clearLayers();
 
@@ -544,7 +546,8 @@ geotab.addin["greenfleet-iq"] = function () {
     }
   });
 }
-updateMapMarkers(trips);
+allStops = trips;
+if (map) updateMapMarkers(allStops);
   }
 
 let map, longStopLayer, nightStopLayer, evLayer;
@@ -572,6 +575,10 @@ function initMap() {
   longStopLayer = L.layerGroup().addTo(map);
   nightStopLayer = L.layerGroup().addTo(map);
   evLayer = L.layerGroup().addTo(map);
+
+  if (allStops.length) {
+    updateMapMarkers(allStops);
+  }
 
   // Fetch EV chargers from NREL (free API - replace DEMO_KEY after registration at developer.nrel.gov)
   fetch('https://developer.nrel.gov/api/alt-fuel-stations/v1.json?api_key=DEMO_KEY&fuel_type=ELEC&state=FL&limit=200')

@@ -132,7 +132,7 @@
 </head>
 <body>
 
-<div class="addin-frame">
+
   <!-- Tab Navigation -->
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="dashboard">📊 Idle & EV Analysis</button>
@@ -260,7 +260,7 @@
     <div id="leaflet-map" style="flex:1;min-height:0"></div>
   </div>
 
-</div><!-- /addin-frame -->
+
   <div id="vehicle-modal" class="modal" style="display:none">
     <div class="modal-content">
       <div class="modal-header">
@@ -956,27 +956,12 @@ geotab.addin["greenfleet-iq"] = () => {
       document.getElementById(btn.dataset.tab).style.display = 'block';
 
       if (btn.dataset.tab === 'map') {
-        const mapTab = document.getElementById('map');
-        mapTab.style.display = 'flex';
-        mapTab.style.flexDirection = 'column';
-
         if (!map) initMap();
-
-        // Ждём, пока flex применится
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (map) {
-              map.invalidateSize(true);  // true — force recalculation
-              map.invalidateSize(true);
-            }
-          });
-        });
-
         if (tripsData && tripsData.length > 0) updateMapMarkers(tripsData);
-      }
       }
     });
   });
+
 
   return {
     initialize: function (addinApi, state, callback) {

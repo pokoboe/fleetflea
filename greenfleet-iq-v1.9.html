@@ -4,19 +4,20 @@
   <meta charset="utf-8">
   <title>GreenFleet IQ • FleetFlea</title>
   <link rel="stylesheet" href="greenfleet-iq.css">
+  <script src="lib/chart.umd.min.js"></script>
   <link rel="stylesheet" href="lib/leaflet.css" />
   <script src="lib/leaflet.js"></script>
-  <script src="lib/chart.umd.min.js"></script>
 </head>
 <body>
 
+  <!-- Tab Navigation -->
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="dashboard">📊 Idle & EV Analysis</button>
     <button class="tab-btn" data-tab="map">⚡ EV Charging Readiness</button>
   </div>
 
-  <div id="dashboard" class="tab-content" style="display:block">
-
+  <!-- DASHBOARD TAB -->
+  <div id="dashboard" class="tab-content">
     <div class="page-header">
       <div>
         <div class="page-title">🌿 GreenFleet IQ</div>
@@ -122,6 +123,7 @@
 
   </div>
 
+  <!-- Map tab -->
   <div id="map" class="tab-content" style="display:none">
     <div class="map-header">
       <h2>EV Charging Readiness</h2>
@@ -198,25 +200,44 @@ function progressBar(pct, color) {
   </div>`;
 }
 
+function parseDur(d) {
+  if (!d) return 0;
+  if (typeof d === "number") return d;
+  if (d.totalSeconds != null) return d.totalSeconds;
+  if (d.ticks != null) return d.ticks / 1e7;
+  if (typeof d === "string") {
+    const p = d.split(":");
+    if (p.length === 3) return (+p[0])*3600 + (+p[1])*60 + +p[2];
+  }
+  return 0;
+}
+
 // Main logic
 geotab.addin["greenfleet-iq"] = () => {
   let api;
   let days = 30;
   let vehicles = [];
   let dailyDataMap = {};
+  let tripsData = []; // to store trips for map
+
   let currentCharts = [];
-  let map, longStopLayer, nightStopLayer, evLayer;
+  let map = null;
+  let longStopLayer = null;
+  nightStopLayer = null;
+  let evLayer = null;
 
   function run(selectedDays) {
     days = selectedDays || days;
     vehicles = [];
     dailyDataMap = {};
+    tripsData = [];
+    currentCharts = [];
 
     const now = new Date();
     const from = new Date(now - days * 86400000);
 
     document.getElementById("page-subtitle").textContent = `Fuel waste · Idle inefficiency · EV readiness · Last ${days} days`;
-    document.getElementById("loading-message").textContent = `Fetching fleet data for last ${days} days...`;
+    document.getElementById("loading-message").textContent = `Fetching fleet data for last ${days} days (trips + harsh events)...`;
     document.getElementById("content").style.display = "none";
     document.getElementById("loading").style.display = "flex";
 
@@ -229,6 +250,7 @@ geotab.addin["greenfleet-iq"] = () => {
         search: { fromDate: from.toISOString(), toDate: now.toISOString() },
         resultsLimit: RESULTS_LIMIT
       }, trips => {
+        tripsData = trips;  // save for map
 
         api.call("Get", {
           typeName: "ExceptionEvent",
@@ -250,9 +272,9 @@ geotab.addin["greenfleet-iq"] = () => {
     const deviceMap = {};
     devices.forEach(d => { deviceMap[d.id] = d; });
 
-    let maxDist = 0;
-    trips.forEach(t => { if ((t.distance||0) > maxDist) maxDist = t.distance; });
-    const kmFactor = maxDist > 5000 ? 0.001 : 1;
+    let maxRawDist = 0;
+    trips.forEach(t => { if ((t.distance||0) > maxRawDist) maxRawDist = t.distance||0; });
+    const kmFactor = maxRawDist > 5000 ? 0.001 : 1;
 
     const byVehicle = {};
 
@@ -262,7 +284,8 @@ geotab.addin["greenfleet-iq"] = () => {
 
       if (!byVehicle[id]) {
         byVehicle[id] = {
-          id, name: nameMap[id] || id,
+          id,
+          name: nameMap[id] || id,
           distKm: 0, trips: 0,
           driveSec: 0, idleSec: 0,
           days: new Set(),
@@ -272,21 +295,9 @@ geotab.addin["greenfleet-iq"] = () => {
       }
       const v = byVehicle[id];
 
-      v.distKm += (t.distance || 0) * kmFactor;
-      v.trips += 1;
+      v.distKm   += (t.distance || 0) * kmFactor;
+      v.trips    += 1;
       v.days.add(t.start?.slice(0,10) || "");
-
-      const parseDur = d => {
-        if (!d) return 0;
-        if (typeof d === "number") return d;
-        if (d.totalSeconds != null) return d.totalSeconds;
-        if (d.ticks != null) return d.ticks / 1e7;
-        if (typeof d === "string") {
-          const p = d.split(":");
-          if (p.length === 3) return (+p[0])*3600 + (+p[1])*60 + +p[2];
-        }
-        return 0;
-      };
 
       v.driveSec += parseDur(t.drivingDuration);
       v.idleSec  += parseDur(t.idlingDuration);
@@ -294,19 +305,6 @@ geotab.addin["greenfleet-iq"] = () => {
       if (t.fuelUsed?.value && !isNaN(t.fuelUsed.value)) {
         v.fuelUsedL += Number(t.fuelUsed.value);
       }
-
-      // Daily aggregation for graphs
-      const day = t.start?.slice(0,10) || '';
-      if (!dailyDataMap[id]) dailyDataMap[id] = {};
-      if (!dailyDataMap[id][day]) dailyDataMap[id][day] = {idleSec:0, driveSec:0, idleFuelL:0, totalFuelL:0};
-
-      const dd = dailyDataMap[id][day];
-      dd.idleSec += parseDur(t.idlingDuration);
-      dd.driveSec += parseDur(t.drivingDuration);
-
-      let drivingFuelL = t.fuelUsed?.value && !isNaN(t.fuelUsed.value) ? Number(t.fuelUsed.value) : ((t.distance||0) * kmFactor * (FUEL_L_PER_100KM / 100));
-      dd.idleFuelL += (parseDur(t.idlingDuration) / 3600) * IDLE_L_PER_HOUR;
-      dd.totalFuelL += drivingFuelL;
     });
 
     const harshKeywords = ["HarshAcceleration", "HarshBrake", "HarshCornering"];
@@ -322,13 +320,13 @@ geotab.addin["greenfleet-iq"] = () => {
     vehicles = Object.values(byVehicle).filter(v => v.trips > 0);
 
     vehicles.forEach(v => {
-      v.idleHrs = v.idleSec / 3600;
-      v.driveHrs = v.driveSec / 3600;
-      v.totalHrs = v.idleHrs + v.driveHrs;
-      v.idlePct = v.totalHrs > 0 ? v.idleSec / (v.driveSec + v.idleSec) * 100 : 0;
+      v.idleHrs    = v.idleSec / 3600;
+      v.driveHrs   = v.driveSec / 3600;
+      v.totalHrs   = v.idleHrs + v.driveHrs;
+      v.idlePct    = v.totalHrs > 0 ? v.idleSec / (v.driveSec + v.idleSec) * 100 : 0;
       v.activeDays = Math.max(v.days.size, 1);
       v.avgDailyKm = v.distKm / v.activeDays;
-      v.tripsDay = v.trips / v.activeDays;
+      v.tripsDay   = v.trips / v.activeDays;
 
       let drivingFuelL;
       if (v.fuelUsedL > 0.1) {
@@ -339,39 +337,42 @@ geotab.addin["greenfleet-iq"] = () => {
         v.fuelSource = "estimate";
       }
 
-      v.idleFuel = v.idleHrs * IDLE_L_PER_HOUR;
-      v.baseFuel = drivingFuelL + v.idleFuel;
+      v.idleFuel   = v.idleHrs * IDLE_L_PER_HOUR;
+      v.baseFuel   = drivingFuelL + v.idleFuel;
 
       const harshPer100 = v.distKm > 0 ? (v.harshCount / v.distKm) * 100 : 0;
       v.harshPenaltyPct = Math.min(MAX_PENALTY_PCT, Math.max(0, (harshPer100 - HARSH_THRESHOLD_PER_100KM) * 0.05)) * 100;
       const penalizedDriving = drivingFuelL * (1 + v.harshPenaltyPct / 100);
-      v.totalFuel = penalizedDriving + v.idleFuel;
+      v.totalFuel  = penalizedDriving + v.idleFuel;
 
       const co2Factor = getEmissionFactor(deviceMap[v.id]);
-      v.co2Kg = v.totalFuel * co2Factor;
-      v.co2IdleKg = v.idleFuel * co2Factor;
+      v.co2Kg      = v.totalFuel * co2Factor;
+      v.co2IdleKg  = v.idleFuel * co2Factor;
 
       v.idleFuelPct = v.totalFuel > 0 ? v.idleFuel / v.totalFuel * 100 : 0;
 
-      v.evScore = evScore(v.avgDailyKm, v.idlePct, v.tripsDay);
+      v.evScore    = evScore(v.avgDailyKm, v.idlePct, v.tripsDay);
     });
 
-    const totalCO2 = vehicles.reduce((s,v)=>s+v.co2Kg, 0) / 1000;
-    const totalIdleL = vehicles.reduce((s,v)=>s+v.idleFuel, 0);
-    const totalFuel = vehicles.reduce((s,v)=>s+v.totalFuel, 0);
+    const totalCO2     = vehicles.reduce((s,v)=>s+v.co2Kg,     0) / 1000;
+    const totalIdleL   = vehicles.reduce((s,v)=>s+v.idleFuel,  0);
+    const totalFuel    = vehicles.reduce((s,v)=>s+v.totalFuel, 0);
     const fleetIdlePct = totalFuel > 0 ? totalIdleL / totalFuel * 100 : 0;
-    const evReady = vehicles.filter(v => v.evScore >= 72);
-    const evCount = evReady.length;
+    const evReady      = vehicles.filter(v => v.evScore >= 72);
+    const evCount      = evReady.length;
 
     document.getElementById("kpi-co2").innerHTML = fmt(totalCO2, totalCO2<10?1:0) + '<span class="unit"> t</span>';
-    document.getElementById("kpi-co2-insight").innerHTML = `≈ <strong>${fmt(totalCO2 * 1000 / 0.115, 0)}</strong> km driven by avg passenger car`;
+    document.getElementById("kpi-co2-insight").innerHTML =
+      `≈ <strong>${fmt(totalCO2 * 1000 / 0.115, 0)}</strong> km driven by avg passenger car`;
 
     document.getElementById("kpi-idle").innerHTML = fmt(totalIdleL, 0) + '<span class="unit"> L</span>';
-    document.getElementById("kpi-idle-insight").innerHTML = `<strong>${fmt(fleetIdlePct,1)}%</strong> of total fuel wasted on idling`;
+    document.getElementById("kpi-idle-insight").innerHTML =
+      `<strong>${fmt(fleetIdlePct,1)}%</strong> of total fuel wasted on idling`;
 
     document.getElementById("kpi-ev").innerHTML = `${evCount}<span class="unit"> / ${vehicles.length}</span>`;
     const potYearCO2 = evReady.reduce((s,v)=>s+v.co2Kg,0) / 1000 * 12 * 0.84;
-    document.getElementById("kpi-ev-insight").innerHTML = `Switching could avoid <strong>${fmt(potYearCO2,0)} t CO₂/year</strong>`;
+    document.getElementById("kpi-ev-insight").innerHTML =
+      `Switching could avoid <strong>${fmt(potYearCO2,0)} t CO₂/year</strong>`;
 
     const worstIdle = [...vehicles].sort((a,b)=>b.idleHrs - a.idleHrs);
 
@@ -422,57 +423,30 @@ geotab.addin["greenfleet-iq"] = () => {
 
     document.getElementById("ev-saving-pill").textContent = `~${fmt(potYearCO2,0)} t CO₂/yr avoided if switched`;
 
+    // Update map if open
+    if (document.getElementById('map').style.display === 'block') {
+      if (!map) initMap();
+      updateMapMarkers(tripsData);
+    }
+
     document.getElementById("loading").style.display = "none";
     document.getElementById("content").style.display = "block";
   }
 
-  let currentCharts = [];
-  document.querySelectorAll('.detail-btn').forEach(btn => {
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const id = btn.dataset.id;
-      const vehicle = vehicles.find(v => v.id === id);
-      if (!vehicle) return;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
 
-      document.getElementById('modal-vehicle-name').textContent = vehicle.name;
+      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+      document.getElementById(btn.dataset.tab).style.display = 'block';
 
-      const days = Object.keys(dailyDataMap[id] || {}).sort();
-      const engineOnData = days.map(d => {
-        const dd = dailyDataMap[id][d];
-        return dd.idleSec / (dd.idleSec + dd.driveSec) * 100 || 0;
-      });
-      const idleFuelPctData = days.map(d => {
-        const dd = dailyDataMap[id][d];
-        return dd.totalFuelL > 0 ? dd.idleFuelL / dd.totalFuelL * 100 : 0;
-      });
-      const fuelWastedData = days.map(d => dailyDataMap[id][d].idleFuelL);
-
-      currentCharts.forEach(c => c.destroy());
-      currentCharts = [];
-
-      currentCharts.push(new Chart(document.getElementById('chart-engine-on'), {
-        type: 'line',
-        data: { labels: days, datasets: [{ label: '% Engine-on', data: engineOnData, borderColor: '#FFB900', tension: 0.3 }] },
-        options: { responsive: true, plugins: { legend: { display: false } } }
-      }));
-
-      currentCharts.push(new Chart(document.getElementById('chart-idle-fuel-pct'), {
-        type: 'line',
-        data: { labels: days, datasets: [{ label: 'Idle % of fuel', data: idleFuelPctData, borderColor: '#D13438', tension: 0.3 }] },
-        options: { responsive: true, plugins: { legend: { display: false } } }
-      }));
-
-      currentCharts.push(new Chart(document.getElementById('chart-fuel-wasted'), {
-        type: 'line',
-        data: { labels: days, datasets: [{ label: 'Fuel wasted (L)', data: fuelWastedData, borderColor: '#107C10', tension: 0.3 }] },
-        options: { responsive: true, plugins: { legend: { display: false } } }
-      }));
-
-      document.getElementById('vehicle-modal').style.display = 'flex';
+      if (btn.dataset.tab === 'map') {
+        if (!map) initMap();
+        if (tripsData && tripsData.length > 0) updateMapMarkers(tripsData);
+      }
     });
-  });
-
-  document.getElementById('modal-close').addEventListener('click', () => {
-    document.getElementById('vehicle-modal').style.display = 'none';
   });
 
   return {

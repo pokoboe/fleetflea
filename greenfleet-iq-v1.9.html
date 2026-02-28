@@ -608,7 +608,7 @@ geotab.addin["greenfleet-iq"] = () => {
 
   function loadEVChargers(lat, lng) {
     // Static pre-generated file in repo — avoids Osano/CSP blocking
-    fetch('ev-chargers.json')
+    fetch('https://pokoboe.github.io/fleetflea/ev-chargers.json')
       .then(function(r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();

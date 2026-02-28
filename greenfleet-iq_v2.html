@@ -2,611 +2,940 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>GreenFleet IQ</title>
+  <title>GreenFleet IQ • FleetFlea</title>
+  <link rel="stylesheet" href="greenfleet-iq.css">
+  <script src="lib/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="lib/leaflet.css" />
+  <script src="lib/leaflet.js"></script>
   <style>
-/* ── Zenith design tokens ── */
-:root {
-  --z-blue:        #0078D4;
-  --z-blue-dark:   #005A9E;
-  --z-green:       #107C10;
-  --z-warning:     #FFB900;
-  --z-red:         #D13438;
-  --z-neutral-900: #201F1E;
-  --z-neutral-600: #605E5C;
-  --z-neutral-300: #C8C6C4;
-  --z-neutral-100: #EDEBE9;
-  --z-white:       #FFFFFF;
-  --z-font:        'Segoe UI', -apple-system, sans-serif;
-  --z-radius:      4px;
-}
+    /* ── Layout: no scroll, fit viewport ── */
+    html, body { height:100%; margin:0; padding:0; overflow:hidden; }
+    body { display:flex; flex-direction:column; background:#F3F2F1; }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+    /* ── Outer frame with breathing room ── */
+    .addin-frame {
+      flex:1; display:flex; flex-direction:column;
+      margin:12px; background:#fff;
+      border:1px solid #C8C6C4; border-radius:8px;
+      overflow:hidden; min-height:0;
+      box-shadow:0 2px 8px rgba(0,0,0,.08);
+    }
 
-body {
-  font-family: var(--z-font);
-  font-size: 14px;
-  color: var(--z-neutral-900);
-  background: var(--z-neutral-100);
-  padding: 24px;
-}
+    /* Tab bar sits inside frame */
+    .tab-bar{display:flex;gap:0;border-bottom:2px solid #EDEBE9;background:#fff;padding:0 20px;flex-shrink:0}
+    .tab-btn{padding:10px 18px;border:none;background:none;font-size:13px;font-weight:600;color:#605E5C;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px}
+    .tab-btn.active{color:#0078D4;border-bottom-color:#0078D4}
+    .tab-btn:hover{color:#201F1E}
 
-/* ── Page header ── */
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 24px;
-}
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--z-neutral-900);
-}
-.page-subtitle {
-  font-size: 12px;
-  color: var(--z-neutral-600);
-  margin-top: 3px;
-}
-.db-label {
-  font-size: 12px;
-  color: var(--z-neutral-600);
-  background: var(--z-white);
-  border: 1px solid var(--z-neutral-300);
-  border-radius: var(--z-radius);
-  padding: 4px 10px;
-  white-space: nowrap;
-}
+    /* Each tab fills remaining height */
+    .tab-content { flex:1; display:none; flex-direction:column; overflow:hidden; min-height:0; }
+    .tab-content.active-tab { display:flex; }
 
-/* ── Loading ── */
-.loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 24px;
-  gap: 16px;
-  color: var(--z-neutral-600);
-  font-size: 14px;
-}
-.spinner {
-  width: 28px; height: 28px;
-  border: 3px solid var(--z-neutral-300);
-  border-top-color: var(--z-blue);
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
+    /* Dashboard scrolls internally */
+    #dashboard { overflow-y:auto; padding:16px 20px; gap:12px; }
 
-/* ── Error banner ── */
-.error-banner {
-  background: #FDE7E9;
-  border-left: 4px solid var(--z-red);
-  border-radius: var(--z-radius);
-  padding: 14px 16px;
-  color: var(--z-red);
-  font-size: 13px;
-  margin-bottom: 16px;
-  display: none;
-}
+    /* KPI cards smaller */
+    .kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
+    .kpi-card{background:#fff;border:1px solid #C8C6C4;border-top:3px solid #C8C6C4;border-radius:4px;padding:14px 18px}
+    .kpi-card.green{border-top-color:#107C10}.kpi-card.orange{border-top-color:#FFB900}.kpi-card.blue{border-top-color:#0078D4}
+    .kpi-label{font-size:10px;font-weight:600;color:#605E5C;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+    .kpi-value{font-size:28px;font-weight:700;line-height:1;color:#201F1E;margin-bottom:2px}
+    .kpi-value .unit{font-size:14px;font-weight:400;color:#605E5C;margin-left:2px}
+    .kpi-desc{font-size:11px;color:#605E5C;line-height:1.4;margin-top:3px}
+    .kpi-insight{margin-top:8px;padding-top:8px;border-top:1px solid #EDEBE9;font-size:11px;color:#605E5C;line-height:1.5}
+    .kpi-insight strong{color:#201F1E}
 
-/* ── KPI cards ── */
-.kpi-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 24px;
-}
-.kpi-card {
-  background: var(--z-white);
-  border: 1px solid var(--z-neutral-300);
-  border-top: 3px solid var(--z-neutral-300);
-  border-radius: var(--z-radius);
-  padding: 20px 24px;
-}
-.kpi-card.green  { border-top-color: var(--z-green); }
-.kpi-card.orange { border-top-color: var(--z-warning); }
-.kpi-card.blue   { border-top-color: var(--z-blue); }
+    /* Tables compact */
+    .section-card{background:#fff;border:1px solid #C8C6C4;border-radius:4px;margin-bottom:10px;overflow:hidden}
+    .section-header{padding:10px 20px;border-bottom:1px solid #EDEBE9;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .section-title{font-size:13px;font-weight:600;color:#201F1E}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:left;padding:7px 16px;font-size:10px;font-weight:600;color:#605E5C;text-transform:uppercase;letter-spacing:.5px;background:#EDEBE9;border-bottom:1px solid #C8C6C4;white-space:nowrap;cursor:help}
+    th[title]{border-bottom:1px dashed #A19F9D}
+    td{padding:8px 16px;font-size:12px;border-bottom:1px solid #EDEBE9;color:#201F1E}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:#F3F2F1}
 
-.kpi-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--z-neutral-600);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
-}
-.kpi-value {
-  font-size: 32px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--z-neutral-900);
-  margin-bottom: 4px;
-}
-.kpi-value .unit {
-  font-size: 16px;
-  font-weight: 400;
-  color: var(--z-neutral-600);
-  margin-left: 2px;
-}
-.kpi-desc {
-  font-size: 12px;
-  color: var(--z-neutral-600);
-  line-height: 1.4;
-  margin-top: 4px;
-}
-.kpi-insight {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--z-neutral-100);
-  font-size: 12px;
-  color: var(--z-neutral-600);
-  line-height: 1.5;
-}
-.kpi-insight strong { color: var(--z-neutral-900); }
+    /* Insight box */
+    .insight-box{display:flex;align-items:flex-start;gap:10px;padding:8px 16px;background:#EFF6FC;border-bottom:1px solid #C7E0F4;font-size:12px;color:#201F1E;line-height:1.5}
+    .insight-box .icon{font-size:14px;margin-top:1px;flex-shrink:0}
 
-/* ── Section cards ── */
-.section-card {
-  background: var(--z-white);
-  border: 1px solid var(--z-neutral-300);
-  border-radius: var(--z-radius);
-  margin-bottom: 16px;
-  overflow: hidden;
-}
-.section-header {
-  padding: 14px 24px;
-  border-bottom: 1px solid var(--z-neutral-100);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--z-neutral-900);
-}
+    /* Pills */
+    .pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap}
+    .pill-green{background:#DFF6DD;color:#107C10}.pill-orange{background:#FFF4CE;color:#7A4F00}
+    .pill-red{background:#FDE7E9;color:#D13438}.pill-blue{background:#EFF6FC;color:#0078D4}
+    .pill-yellow{background:#FFF4CE;color:#7A4F00}.pill-yellow.active{background:#FFB900;color:#fff}
+    .pill-purple{background:#F4F0FF;color:#6B2D8B}.pill-purple.active{background:#8764B8;color:#fff}
 
-/* ── Table ── */
-table { width: 100%; border-collapse: collapse; }
-th {
-  text-align: left;
-  padding: 9px 24px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--z-neutral-600);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: var(--z-neutral-100);
-  border-bottom: 1px solid var(--z-neutral-300);
-  white-space: nowrap;
-}
-td {
-  padding: 11px 24px;
-  font-size: 13px;
-  border-bottom: 1px solid var(--z-neutral-100);
-  color: var(--z-neutral-900);
-}
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: #F3F2F1; }
+    /* Progress bar */
+    .progress-wrap{display:flex;align-items:center;gap:6px}
+    .progress-bg{flex:1;min-width:50px;height:5px;background:#EDEBE9;border-radius:3px;overflow:hidden}
+    .progress-fill{height:100%;border-radius:3px}
+    .progress-label{font-size:11px;color:#605E5C;min-width:32px;text-align:right}
 
-/* ── Pills ── */
-.pill {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.pill-green  { background: #DFF6DD; color: #107C10; }
-.pill-orange { background: #FFF4CE; color: #7A4F00; }
-.pill-red    { background: #FDE7E9; color: #D13438; }
-.pill-blue   { background: #EFF6FC; color: #0078D4; }
+    /* Buttons */
+    .detail-btn{background:none;border:1px solid #C8C6C4;border-radius:4px;cursor:pointer;padding:2px 6px;font-size:12px;color:#605E5C}
+    .detail-btn:hover{border-color:#0078D4;color:#0078D4}
+    .ask-ice-btn{background:#EFF6FC;border:1px solid #C7E0F4;border-radius:4px;cursor:pointer;padding:2px 8px;font-size:11px;font-weight:600;color:#0078D4;white-space:nowrap}
+    .ask-ice-btn:hover{background:#0078D4;color:#fff}
 
-/* ── Progress bar ── */
-.progress-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.progress-bg {
-  flex: 1;
-  min-width: 60px;
-  height: 6px;
-  background: var(--z-neutral-100);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  border-radius: 3px;
-}
-.progress-label {
-  font-size: 12px;
-  color: var(--z-neutral-600);
-  min-width: 36px;
-  text-align: right;
-}
+    /* Header */
+    .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+    .page-title{font-size:18px;font-weight:600;color:#201F1E}
+    .page-subtitle{font-size:11px;color:#605E5C;margin-top:2px}
+    .header-right{display:flex;align-items:center;gap:8px}
+    .version-label{font-size:10px;color:#605E5C}
+    .db-label{font-size:11px;color:#605E5C;background:#fff;border:1px solid #C8C6C4;border-radius:4px;padding:3px 8px}
 
-/* ── Insight box ── */
-.insight-box {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 24px;
-  background: #EFF6FC;
-  border-bottom: 1px solid #C7E0F4;
-  font-size: 13px;
-  color: var(--z-neutral-900);
-  line-height: 1.5;
-}
-.insight-box .icon { font-size: 16px; margin-top: 1px; flex-shrink: 0; }
+    /* Date select */
+    #range-select{font-size:11px;color:#605E5C;background:#fff;border:1px solid #C8C6C4;border-radius:4px;padding:3px 8px;cursor:pointer;height:26px}
+    #range-select:hover,#range-select:focus{border-color:#0078D4;outline:none}
 
-/* ── Responsive ── */
-@media (max-width: 768px) {
-  body { padding: 16px; }
-  .kpi-row { grid-template-columns: 1fr; }
-  th, td { padding-left: 16px; padding-right: 16px; }
-}
+    /* Loading */
+    .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;gap:14px;color:#605E5C;font-size:13px}
+    .spinner{width:24px;height:24px;border:3px solid #EDEBE9;border-top-color:#0078D4;border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
 
+    /* Error */
+    .error-banner{background:#FDE7E9;border-left:4px solid #D13438;border-radius:4px;padding:10px 14px;color:#D13438;font-size:12px;margin-bottom:10px;display:none}
+
+    /* Footer */
+    .footer{padding:8px 0;font-size:10px;color:#A19F9D;border-top:1px solid #EDEBE9;text-align:center;margin-top:8px}
+
+    /* Map */
+    .map-header{padding:10px 20px;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid #EDEBE9;flex-shrink:0}
+    .map-header h2{font-size:13px;font-weight:600;color:#201F1E}
+    .map-filters{display:flex;gap:8px}
+    #leaflet-map{flex:1}
+
+    /* Modal */
+    .modal{position:fixed;inset:0;background:rgba(32,31,30,.55);display:flex;align-items:center;justify-content:center;z-index:2000}
+    .modal-content{background:#fff;border:1px solid #C8C6C4;border-radius:6px;width:92%;max-width:820px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+    .modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #EDEBE9;flex-shrink:0}
+    .modal-vehicle-title{font-size:15px;font-weight:600;color:#201F1E}
+    .modal-subtitle{font-size:11px;color:#605E5C;margin-top:2px}
+    .modal-close-btn{background:none;border:1px solid #C8C6C4;border-radius:4px;font-size:16px;cursor:pointer;color:#605E5C;padding:2px 8px;line-height:1.4}
+    .modal-close-btn:hover{background:#EDEBE9;color:#201F1E;border-color:#A19F9D}
+    .modal-body{padding:16px 20px 20px;overflow-y:auto;flex:1}
+    .chart-wrap{position:relative;height:240px;margin-top:4px}
+
+    /* Ask ICE modal */
+    .ice-response{font-size:13px;color:#201F1E;line-height:1.7;white-space:pre-wrap}
+    .ice-loading{display:flex;align-items:center;gap:10px;color:#605E5C;font-size:13px;padding:20px 0}
   </style>
 </head>
 <body>
-
-  <!-- Page header -->
-  <div class="page-header">
-    <div>
-      <div class="page-title">🌿 GreenFleet IQ</div>
-      <div class="page-subtitle">Fuel waste &amp; EV readiness · Last 7 days</div>
-    </div>
-    <span class="db-label" id="db-label">Loading...</span>
+<div class="addin-frame">
+  <!-- Tab Navigation -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="dashboard">📊 Idle & EV Analysis</button>
+    <button class="tab-btn" data-tab="map">⚡ EV Charging Readiness</button>
   </div>
 
-  <!-- Error -->
-  <div class="error-banner" id="error-banner"></div>
+  <!-- DASHBOARD TAB -->
+  <div id="dashboard" class="tab-content active-tab">
+    <div class="page-header">
+      <div>
+        <div class="page-title">🌿 GreenFleet IQ</div>
+        <div class="page-subtitle" id="page-subtitle">Fuel waste · Idle inefficiency · EV readiness · Last 30 days</div>
+      </div>
+      <div class="header-right">
+        <select id="range-select">
+          <option value="1">Last day</option>
+          <option value="5">Last 5 days</option>
+          <option value="30" selected>Last 30 days</option>
+        </select>
+        <span class="db-label" id="db-label">Loading...</span>
+        <span class="version-label">v1.9 · FleetFlea</span>
+      </div>
+    </div>
 
-  <!-- Loading -->
-  <div class="loading" id="loading">
-    <div class="spinner"></div>
-    <span>Fetching fleet data...</span>
+    <div class="error-banner" id="error-banner" style="display:none"></div>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div id="loading-message">Fetching fleet data for last 30 days (trips + harsh events)...</div>
+    </div>
+
+    <div id="content" style="display:none">
+
+      <div class="kpi-row">
+        <div class="kpi-card green">
+          <div class="kpi-label">🌍 CO₂ emitted</div>
+          <div class="kpi-value" id="kpi-co2">—<span class="unit"> t</span></div>
+          <div class="kpi-desc">Tailpipe — engine data when available</div>
+          <div class="kpi-insight" id="kpi-co2-insight"></div>
+        </div>
+
+        <div class="kpi-card orange">
+          <div class="kpi-label">⏱️ Idle fuel wasted</div>
+          <div class="kpi-value" id="kpi-idle">—<span class="unit"> L</span></div>
+          <div class="kpi-desc">Engine running — vehicle stationary</div>
+          <div class="kpi-insight" id="kpi-idle-insight"></div>
+        </div>
+
+        <div class="kpi-card blue">
+          <div class="kpi-label">⚡ EV-ready vehicles</div>
+          <div class="kpi-value" id="kpi-ev">—<span class="unit"></span></div>
+          <div class="kpi-desc">Score ≥ 72 — good fit for current pattern</div>
+          <div class="kpi-insight" id="kpi-ev-insight"></div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">Top 10 Idle Offenders</span>
+          <span class="pill pill-orange" id="idle-fleet-pct"></span>
+        </div>
+        <div class="section-body">
+          <div class="insight-box" id="idle-highlight"></div>
+          <table>
+            <thead>
+              <tr>
+                <th title="Vehicle name from MyGeotab">Vehicle</th>
+                <th title="Total hours engine was running but vehicle not moving">Idle time</th>
+                <th title="Idle time as % of total engine-on time (drive + idle)">% engine-on</th>
+                <th title="Idle fuel as % of total estimated fuel consumed">Idle % of fuel</th>
+                <th title="Estimated litres burned while idling (0.8 L/hr rate)">Fuel wasted</th>
+                <th title="CO₂ from idle fuel only (2.32 kg/L gasoline, 2.7 diesel)">CO₂ wasted</th>
+                <th title="Critical >28% idle · High >16% · Normal ≤16%">Status</th>
+                <th title="Open daily trend chart for this vehicle">📊</th>
+              </tr>
+            </thead>
+            <tbody id="idle-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">Top EV Transition Candidates</span>
+          <span class="pill pill-blue" id="ev-saving-pill"></span>
+        </div>
+        <div class="section-body">
+          <div class="insight-box" id="ev-highlight"></div>
+          <table>
+            <thead>
+              <tr>
+                <th title="Vehicle name from MyGeotab">Vehicle</th>
+                <th title="Average km driven per active day in selected period">Avg daily km</th>
+                <th title="Average number of trips per active day">Trips / day</th>
+                <th title="Idle time as % of total engine-on time">Idle %</th>
+                <th title="Fuel penalty for harsh driving events (acceleration, braking, cornering)">Harsh penalty</th>
+                <th title="EV readiness score 0–100: range fit + idle behavior + trip frequency">EV Score</th>
+                <th title="Strong EV fit ≥72 · Good candidate ≥55 · Possible ≥38">Recommendation</th>
+                <th title="Ask Claude AI for detailed EV transition analysis for this vehicle">Ask AI</th>
+              </tr>
+            </thead>
+            <tbody id="ev-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="footer">
+        GreenFleet IQ v1.9 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
+      </div>
+
+    </div>
+
   </div>
 
-  <!-- Content (hidden until loaded) -->
-  <div id="content" style="display:none">
-
-    <!-- KPI row -->
-    <div class="kpi-row">
-
-      <div class="kpi-card green">
-        <div class="kpi-label">🌍 CO₂ Emitted</div>
-        <div class="kpi-value" id="kpi-co2">—<span class="unit">t</span></div>
-        <div class="kpi-desc">Estimated from real trip distances</div>
-        <div class="kpi-insight" id="kpi-co2-insight"></div>
-      </div>
-
-      <div class="kpi-card orange">
-        <div class="kpi-label">⏱️ Idle Fuel Wasted</div>
-        <div class="kpi-value" id="kpi-idle">—<span class="unit">L</span></div>
-        <div class="kpi-desc">Engine on, not moving</div>
-        <div class="kpi-insight" id="kpi-idle-insight"></div>
-      </div>
-
-      <div class="kpi-card blue">
-        <div class="kpi-label">⚡ EV-Ready Vehicles</div>
-        <div class="kpi-value" id="kpi-ev">—<span class="unit"></span></div>
-        <div class="kpi-desc">Score ≥ 75: daily range fits EV, idle waste, trip pattern</div>
-        <div class="kpi-insight" id="kpi-ev-insight"></div>
-      </div>
-
-    </div>
-
-    <!-- Idle table -->
-    <div class="section-card">
-      <div class="section-header">
-        <span class="section-title">Idle Time — Top 10 Worst Offenders</span>
-        <span class="pill pill-orange" id="idle-fleet-pct"></span>
-      </div>
-      <div class="section-body">
-        <div class="insight-box" id="idle-highlight"></div>
-        <table>
-          <thead>
-            <tr>
-              <th>Vehicle</th>
-              <th>Idle Time</th>
-              <th>% of Engine-On</th>
-              <th>Fuel Wasted</th>
-              <th>CO₂ Wasted</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="idle-tbody"></tbody>
-        </table>
+  <!-- Map tab -->
+  <div id="map" class="tab-content" style="flex-direction:column">
+    <div class="map-header">
+      <h2>EV Charging Readiness</h2>
+      <div class="map-filters">
+        <button class="pill pill-yellow active" id="filter-long">30–60 min stops</button>
+        <button class="pill pill-purple active" id="filter-night">Night stops</button>
+        <button class="pill pill-green active" id="filter-ev">EV Chargers</button>
       </div>
     </div>
+    <div id="leaflet-map" style="flex:1;min-height:0"></div>
+  </div>
 
-    <!-- EV readiness table -->
-    <div class="section-card">
-      <div class="section-header">
-        <span class="section-title">EV Readiness — Top Candidates</span>
-        <span class="pill pill-blue" id="ev-saving-pill"></span>
+</div><!-- /addin-frame -->
+  <div id="vehicle-modal" class="modal" style="display:none">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <div class="modal-vehicle-title" id="modal-vehicle-name"></div>
+          <div class="modal-subtitle">Daily idle breakdown — trends over selected period</div>
+        </div>
+        <button class="modal-close-btn" id="modal-close">✕ Close</button>
       </div>
-      <div class="section-body">
-        <div class="insight-box" id="ev-highlight"></div>
-        <table>
-          <thead>
-            <tr>
-              <th>Vehicle</th>
-              <th>Avg Daily km</th>
-              <th>Trips / Day</th>
-              <th>Idle %</th>
-              <th>EV Score</th>
-              <th>Verdict</th>
-            </tr>
-          </thead>
-          <tbody id="ev-tbody"></tbody>
-        </table>
+      <div class="modal-body">
+        <div class="chart-wrap"><canvas id="chart-combined"></canvas></div>
       </div>
     </div>
+  </div>
 
-  </div><!-- /content -->
+  <!-- Ask ICE / AI modal -->
+  <div id="ice-modal" class="modal" style="display:none">
+    <div class="modal-content" style="max-width:680px">
+      <div class="modal-header">
+        <div>
+          <div class="modal-vehicle-title" id="ice-modal-title">EV Transition Analysis</div>
+          <div class="modal-subtitle" id="ice-modal-subtitle"></div>
+        </div>
+        <button class="modal-close-btn" id="ice-modal-close">✕ Close</button>
+      </div>
+      <div class="modal-body">
+        <div id="ice-loading" class="ice-loading" style="display:none">
+          <div class="spinner"></div><span>Asking Claude AI for analysis...</span>
+        </div>
+        <div id="ice-response" class="ice-response"></div>
+      </div>
+    </div>
+  </div>
 
 <script>
+(function() {
 "use strict";
 
-// ── Constants ─────────────────────────────────────────────────
-var CO2_KG_PER_LITRE = 2.31;   // gasoline
-var FUEL_L_PER_KM    = 0.10;   // 10 L / 100 km fleet avg
-var IDLE_FUEL_L_HR   = 0.8;    // litres / hour idling
-var DAYS             = 7;
+// Constants
+const CO2_KG_PER_L_GASOLINE = 2.32;
+const CO2_KG_PER_L_DIESEL   = 2.697;
+const FUEL_L_PER_100KM      = 10.0;
+const IDLE_L_PER_HOUR       = 0.80;
+const RESULTS_LIMIT         = 50000;
 
-// ── Helpers ───────────────────────────────────────────────────
-function fmt(n, dec) {
-  if (n == null || isNaN(n)) return "—";
-  return Number(n).toLocaleString(undefined, { maximumFractionDigits: dec != null ? dec : 0 });
-}
+const HARSH_THRESHOLD_PER_100KM = 4;
+const MAX_PENALTY_PCT           = 0.25;
+
+// Helpers
+const fmt = (n, dec = 0) => isNaN(n) || n == null ? "—" : Number(n).toLocaleString(undefined, {maximumFractionDigits: dec});
+
 function showError(msg) {
-  var el = document.getElementById("error-banner");
+  const el = document.getElementById("error-banner");
   el.textContent = "⚠️ " + msg;
   el.style.display = "block";
   document.getElementById("loading").style.display = "none";
 }
-function evScore(avgDailyKm, idlePct, tripsPerDay) {
-  var s = 0;
-  // Range: ≤200 km/day = 40pts (modern EVs do 300+ km)
-  s += Math.max(0, Math.min(40, (200 - avgDailyKm) / 200 * 40));
-  // Idle: 25%+ = full 30pts (EV eliminates idle waste entirely)
-  s += Math.min(30, idlePct / 25 * 30);
-  // Trips: 2+ trips/day = full 20pts (frequent stop-start = EV sweet spot)
-  s += Math.min(20, tripsPerDay / 2 * 20);
-  // Base
-  s += 10;
+
+function getEmissionFactor(device) {
+  const type = (device?.engineType || "").toLowerCase();
+  if (type.includes("diesel")) return CO2_KG_PER_L_DIESEL;
+  return CO2_KG_PER_L_GASOLINE;
+}
+
+function evScore(avgKm, idlePct, tripsDay) {
+  let s = 10;
+  let rangePts = 42 * Math.max(0, 1 - Math.max(0, avgKm - 250) / 130);
+  s += rangePts;
+  s += Math.min(30, idlePct * 0.30);
+  s += Math.min(22, tripsDay * 6.5);
+  if (avgKm > 180 && tripsDay > 6 && idlePct > 12) s += 10;
   return Math.min(100, Math.round(s));
 }
-function evVerdict(score) {
-  if (score >= 75) return ["EV Ready",  "pill-green"];
-  if (score >= 55) return ["Good Fit",  "pill-blue"];
-  if (score >= 40) return ["Consider",  "pill-orange"];
-  return ["Not Yet", "pill-red"];
+
+function verdict(score) {
+  if (score >= 72) return ["Strong EV fit", "pill-green"];
+  if (score >= 55) return ["Good candidate", "pill-blue"];
+  if (score >= 38) return ["Possible", "pill-orange"];
+  return ["Low priority", "pill-red"];
 }
+
 function progressBar(pct, color) {
-  return '<div class="progress-wrap">' +
-    '<div class="progress-bg"><div class="progress-fill" style="width:' +
-    Math.min(pct, 100) + '%;background:' + color + '"></div></div>' +
-    '<span class="progress-label">' + fmt(pct, 0) + '%</span></div>';
+  return `<div class="progress-wrap">
+    <div class="progress-bg"><div class="progress-fill" style="width:${Math.min(pct,100)}%;background:${color}"></div></div>
+    <span class="progress-label">${fmt(pct,0)}%</span>
+  </div>`;
 }
 
-// ── Main ──────────────────────────────────────────────────────
-geotab.addin["greenfleet-iq"] = function () {
-  var apiRef;
+function parseDur(d) {
+  if (!d) return 0;
+  if (typeof d === "number") return d;
+  if (d.totalSeconds != null) return d.totalSeconds;
+  if (d.ticks != null) return d.ticks / 1e7;
+  if (typeof d === "string") {
+    const p = d.split(":");
+    if (p.length === 3) return (+p[0])*3600 + (+p[1])*60 + +p[2];
+  }
+  return 0;
+}
 
-  function run(api) {
-    apiRef = api;
-    var now   = new Date();
-    var from  = new Date(now - DAYS * 24 * 3600 * 1000);
+// Main logic
+geotab.addin["greenfleet-iq"] = () => {
+  let api;
+  let days = 30;
+  let vehicles = [];
+  let dailyDataMap = {};
+  let tripsData = []; // to store trips for map
 
-    // Parallel: devices + trips
-    api.call("Get", { typeName: "Device" }, function (devices) {
+  let currentCharts = [];
+  let map = null;
+  let longStopLayer = null;
+  let nightStopLayer = null;
+  let evLayer = null;
 
-      var nameMap = {};
-      devices.forEach(function (d) { nameMap[d.id] = d.name; });
+  function run(selectedDays) {
+    days = selectedDays || days;
+    vehicles = [];
+    dailyDataMap = {};
+    tripsData = [];
+    currentCharts = [];
+
+    const now = new Date();
+    const from = new Date(now - days * 86400000);
+
+    document.getElementById("page-subtitle").textContent = `Fuel waste · Idle inefficiency · EV readiness · Last ${days} days`;
+    document.getElementById("loading-message").textContent = `Fetching fleet data for last ${days} days (trips + harsh events)...`;
+    document.getElementById("content").style.display = "none";
+    document.getElementById("loading").style.display = "flex";
+
+    api.call("Get", { typeName: "Device" }, devices => {
+      const nameMap = {};
+      devices.forEach(d => { nameMap[d.id] = d.name || d.serialNumber || d.id; });
 
       api.call("Get", {
         typeName: "Trip",
-        search: {
-          fromDate: from.toISOString(),
-          toDate:   now.toISOString()
-        },
-        resultsLimit: 50000
-      }, function (trips) {
+        search: { fromDate: from.toISOString(), toDate: now.toISOString() },
+        resultsLimit: RESULTS_LIMIT
+      }, trips => {
+        tripsData = trips;  // save for map
 
-        render(trips, nameMap);
+        api.call("Get", {
+          typeName: "ExceptionEvent",
+          search: { fromDate: from.toISOString(), toDate: now.toISOString() },
+          resultsLimit: 15000
+        }, exceptions => {
+          render(trips, exceptions, nameMap, devices);
+        }, err => {
+          console.warn("ExceptionEvent fetch failed — no harsh penalty", err);
+          render(trips, [], nameMap, devices);
+        });
 
-      }, function (err) { showError("Failed to load trips: " + err); });
+      }, err => showError("Trips fetch failed: " + err));
 
-    }, function (err) { showError("Failed to load devices: " + err); });
+    }, err => showError("Devices fetch failed: " + err));
   }
 
-  function render(trips, nameMap) {
-    // ── Aggregate by vehicle ───────────────────────────────
-    var byVehicle = {};
+  function render(trips, exceptions, nameMap, devices) {
+    const deviceMap = {};
+    devices.forEach(d => { deviceMap[d.id] = d; });
 
-    // Detect distance unit from first non-zero trip:
-    // JS API returns km (small numbers ~50-500), Python returns meters (50000+)
-    // We check: if max raw distance > 5000, it's meters; otherwise km.
-    var maxRawDist = 0;
-    trips.forEach(function(t) { if ((t.distance||0) > maxRawDist) maxRawDist = t.distance||0; });
-    var distDivisor = (maxRawDist > 5000) ? 1000 : 1;
+    let maxRawDist = 0;
+    trips.forEach(t => { if ((t.distance||0) > maxRawDist) maxRawDist = t.distance||0; });
+    const kmFactor = maxRawDist > 5000 ? 0.001 : 1;
 
-    trips.forEach(function (t) {
-      var id = t.device && t.device.id;
+    const byVehicle = {};
+
+    trips.forEach(t => {
+      const id = t.device?.id;
       if (!id) return;
+
       if (!byVehicle[id]) {
         byVehicle[id] = {
-          id: id,
+          id,
           name: nameMap[id] || id,
-          distKm: 0, tripCount: 0,
+          distKm: 0, trips: 0,
           driveSec: 0, idleSec: 0,
-          days: {}
+          days: new Set(),
+          fuelUsedL: 0,
+          harshCount: 0
         };
       }
-      var v = byVehicle[id];
+      const v = byVehicle[id];
 
-      // Distance: auto-detect meters vs km
-      v.distKm    += (t.distance || 0) / distDivisor;
-      v.tripCount += 1;
+      v.distKm   += (t.distance || 0) * kmFactor;
+      v.trips    += 1;
+      v.days.add(t.start?.slice(0,10) || "");
 
-      // Duration: try multiple formats the JS API might return
-      // Format A: { totalSeconds: 1234 }
-      // Format B: { ticks: 12340000000 }  (100-ns ticks)
-      // Format C: number (raw seconds)
-      function parseDuration(d) {
-        if (!d) return 0;
-        if (typeof d === "number") return d;
-        if (d.totalSeconds != null) return d.totalSeconds;
-        if (d.ticks != null) return d.ticks / 1e7;
-        // ISO 8601 duration string "00:12:34" or "PT12M34S"
-        if (typeof d === "string") {
-          // "HH:MM:SS" format
-          var parts = d.split(":");
-          if (parts.length === 3)
-            return parseInt(parts[0])*3600 + parseInt(parts[1])*60 + parseFloat(parts[2]);
-        }
-        return 0;
+      v.driveSec += parseDur(t.drivingDuration);
+      v.idleSec  += parseDur(t.idlingDuration);
+
+      // Daily map for chart modal
+      const day = (t.start || '').slice(0, 10) || 'unknown';
+      if (!dailyDataMap[id])      dailyDataMap[id] = {};
+      if (!dailyDataMap[id][day]) dailyDataMap[id][day] = {idleSec:0, driveSec:0, idleFuelL:0, totalFuelL:0};
+      const _dd = dailyDataMap[id][day];
+      const _di = parseDur(t.idlingDuration);
+      const _dk = (t.distance||0) * kmFactor;
+      _dd.idleSec   += _di;
+      _dd.driveSec  += parseDur(t.drivingDuration);
+      _dd.idleFuelL += (_di/3600) * IDLE_L_PER_HOUR;
+      _dd.totalFuelL += (t.fuelUsed?.value ? Number(t.fuelUsed.value) : _dk*(FUEL_L_PER_100KM/100)) + (_di/3600)*IDLE_L_PER_HOUR;
+
+      if (t.fuelUsed?.value && !isNaN(t.fuelUsed.value)) {
+        v.fuelUsedL += Number(t.fuelUsed.value);
+      }
+    });
+
+    const harshKeywords = ["HarshAcceleration", "HarshBrake", "HarshCornering"];
+    exceptions.forEach(e => {
+      const vid = e.device?.id;
+      if (!vid || !byVehicle[vid]) return;
+      const ruleName = (e.rule?.name || "").toLowerCase();
+      if (harshKeywords.some(kw => ruleName.includes(kw.toLowerCase()))) {
+        byVehicle[vid].harshCount++;
+      }
+    });
+
+    vehicles = Object.values(byVehicle).filter(v => v.trips > 0);
+
+    vehicles.forEach(v => {
+      v.idleHrs    = v.idleSec / 3600;
+      v.driveHrs   = v.driveSec / 3600;
+      v.totalHrs   = v.idleHrs + v.driveHrs;
+      v.idlePct    = v.totalHrs > 0 ? v.idleSec / (v.driveSec + v.idleSec) * 100 : 0;
+      v.activeDays = Math.max(v.days.size, 1);
+      v.avgDailyKm = v.distKm / v.activeDays;
+      v.tripsDay   = v.trips / v.activeDays;
+
+      let drivingFuelL;
+      if (v.fuelUsedL > 0.1) {
+        drivingFuelL = v.fuelUsedL;
+        v.fuelSource = "engine";
+      } else {
+        drivingFuelL = v.distKm * (FUEL_L_PER_100KM / 100);
+        v.fuelSource = "estimate";
       }
 
-      v.driveSec += parseDuration(t.drivingDuration);
-      v.idleSec  += parseDuration(t.idlingDuration);
-      if (t.start) v.days[t.start.substring(0, 10)] = 1;
+      v.idleFuel   = v.idleHrs * IDLE_L_PER_HOUR;
+      v.baseFuel   = drivingFuelL + v.idleFuel;
+
+      const harshPer100 = v.distKm > 0 ? (v.harshCount / v.distKm) * 100 : 0;
+      v.harshPenaltyPct = Math.min(MAX_PENALTY_PCT, Math.max(0, (harshPer100 - HARSH_THRESHOLD_PER_100KM) * 0.05)) * 100;
+      const penalizedDriving = drivingFuelL * (1 + v.harshPenaltyPct / 100);
+      v.totalFuel  = penalizedDriving + v.idleFuel;
+
+      const co2Factor = getEmissionFactor(deviceMap[v.id]);
+      v.co2Kg      = v.totalFuel * co2Factor;
+      v.co2IdleKg  = v.idleFuel * co2Factor;
+
+      v.idleFuelPct = v.totalFuel > 0 ? v.idleFuel / v.totalFuel * 100 : 0;
+
+      v.evScore    = evScore(v.avgDailyKm, v.idlePct, v.tripsDay);
     });
 
-    var vehicles = Object.values(byVehicle).filter(function (v) {
-      return v.tripCount > 0;
-    });
+    const totalCO2     = vehicles.reduce((s,v)=>s+v.co2Kg,     0) / 1000;
+    const totalIdleL   = vehicles.reduce((s,v)=>s+v.idleFuel,  0);
+    const totalFuel    = vehicles.reduce((s,v)=>s+v.totalFuel, 0);
+    const fleetIdlePct = totalFuel > 0 ? totalIdleL / totalFuel * 100 : 0;
+    const evReady      = vehicles.filter(v => v.evScore >= 72);
+    const evCount      = evReady.length;
 
-    // ── Derived metrics ────────────────────────────────────
-    vehicles.forEach(function (v) {
-      v.idleHrs     = v.idleSec / 3600;
-      v.driveHrs    = v.driveSec / 3600;
-      v.totalHrs    = v.idleHrs + v.driveHrs;
-      v.idlePct     = v.totalHrs > 0 ? v.idleSec / (v.driveSec + v.idleSec) * 100 : 0;
-      v.activeDays  = Math.max(Object.keys(v.days).length, 1);
-      v.avgDailyKm  = v.distKm / v.activeDays;
-      v.tripsPerDay = v.tripCount / v.activeDays;
-      v.idleFuelL   = v.idleHrs * IDLE_FUEL_L_HR;
-      v.driveFuelL  = v.distKm  * FUEL_L_PER_KM;
-      v.totalFuelL  = v.driveFuelL + v.idleFuelL;
-      v.co2Kg       = v.totalFuelL * CO2_KG_PER_LITRE;
-      v.co2IdleKg   = v.idleFuelL  * CO2_KG_PER_LITRE;
-      v.evScore     = evScore(v.avgDailyKm, v.idlePct, v.tripsPerDay);
-    });
-
-    // ── Fleet totals ───────────────────────────────────────
-    var totalCO2Kg    = vehicles.reduce(function (s, v) { return s + v.co2Kg; }, 0);
-    var totalIdleFuel = vehicles.reduce(function (s, v) { return s + v.idleFuelL; }, 0);
-    var totalFuel     = vehicles.reduce(function (s, v) { return s + v.totalFuelL; }, 0);
-    var fleetIdlePct  = totalFuel > 0 ? totalIdleFuel / totalFuel * 100 : 0;
-    var evReady       = vehicles.filter(function (v) { return v.evScore >= 75; });
-
-    // ── KPI cards ──────────────────────────────────────────
-    var co2T = totalCO2Kg / 1000;
-    document.getElementById("kpi-co2").innerHTML =
-      fmt(co2T, co2T < 10 ? 1 : 0) + '<span class="unit"> t</span>';
+    document.getElementById("kpi-co2").innerHTML = fmt(totalCO2, totalCO2<10?1:0) + '<span class="unit"> t</span>';
     document.getElementById("kpi-co2-insight").innerHTML =
-      'Equiv. <strong>' + fmt(co2T * 1000 / 0.12, 0) + ' km</strong> driven by avg car';
+      `≈ <strong>${fmt(totalCO2 * 1000 / 0.115, 0)}</strong> km driven by avg passenger car`;
 
-    document.getElementById("kpi-idle").innerHTML =
-      fmt(totalIdleFuel, 0) + '<span class="unit"> L</span>';
+    document.getElementById("kpi-idle").innerHTML = fmt(totalIdleL, 0) + '<span class="unit"> L</span>';
     document.getElementById("kpi-idle-insight").innerHTML =
-      '<strong>' + fmt(fleetIdlePct, 1) + '%</strong> of all fuel burned — engine on, going nowhere';
+      `<strong>${fmt(fleetIdlePct,1)}%</strong> of total fuel wasted on idling`;
 
-    var evCount = evReady.length;
-    document.getElementById("kpi-ev").innerHTML =
-      evCount + '<span class="unit"> / ' + vehicles.length + '</span>';
-    var potentialCO2T = evReady.reduce(function (s, v) { return s + v.co2Kg; }, 0) / 1000 * 12 * 0.85;
+    document.getElementById("kpi-ev").innerHTML = `${evCount}<span class="unit"> / ${vehicles.length}</span>`;
+    const potYearCO2 = evReady.reduce((s,v)=>s+v.co2Kg,0) / 1000 * 12 * 0.84;
     document.getElementById("kpi-ev-insight").innerHTML =
-      'Could avoid <strong>' + fmt(potentialCO2T, 0) + ' t CO₂/year</strong> if switched to EV';
+      `Switching could avoid <strong>${fmt(potYearCO2,0)} t CO₂/year</strong>`;
 
-    // ── Idle table ─────────────────────────────────────────
-    document.getElementById("idle-fleet-pct").textContent =
-      fmt(fleetIdlePct, 1) + "% fleet idle";
+    const worstIdle = [...vehicles].sort(function(a,b){ return b.idlePct - a.idlePct; });
 
-    var worstIdle = vehicles.slice().sort(function (a, b) { return b.idleHrs - a.idleHrs; });
-    var topIdle   = worstIdle[0];
+    document.getElementById("idle-fleet-pct").textContent = fmt(fleetIdlePct,1) + "% fleet idle";
+
     document.getElementById("idle-highlight").innerHTML =
-      '<span class="icon">💡</span>' +
-      'Eliminating idle on the <strong>top 3 offenders</strong> alone would save ' +
-      '<strong>' + fmt(worstIdle.slice(0,3).reduce(function(s,v){return s+v.idleFuelL;},0), 0) +
-      ' L of fuel</strong> and <strong>' +
-      fmt(worstIdle.slice(0,3).reduce(function(s,v){return s+v.co2IdleKg;},0)/1000, 2) +
-      ' t CO₂</strong> this week.';
+      `<span class="icon">💡</span> Fixing idle on the <strong>top 3</strong> alone would save ` +
+      `<strong>${fmt(worstIdle.slice(0,3).reduce((s,v)=>s+v.idleFuel,0),0)} L</strong> fuel and ` +
+      `<strong>${fmt(worstIdle.slice(0,3).reduce((s,v)=>s+v.co2IdleKg,0)/1000,1)} t CO₂</strong> this period.`;
 
-    var idleTop10 = worstIdle.slice(0, 10);
-    document.getElementById("idle-tbody").innerHTML = idleTop10.map(function (v, i) {
-      var pctColor = v.idlePct > 25 ? "#D13438" : v.idlePct > 15 ? "#FFB900" : "#107C10";
-      var statusCls = v.idlePct > 25 ? "pill-red" : v.idlePct > 15 ? "pill-orange" : "pill-green";
-      var statusTxt = v.idlePct > 25 ? "Critical" : v.idlePct > 15 ? "High" : "Normal";
-      return "<tr>" +
-        "<td><strong>" + v.name + "</strong></td>" +
-        "<td>" + fmt(v.idleHrs, 1) + " hrs</td>" +
-        "<td class='idle-bar-cell'>" + progressBar(v.idlePct, pctColor) + "</td>" +
-        "<td>" + fmt(v.idleFuelL, 0) + " L</td>" +
-        "<td>" + fmt(v.co2IdleKg, 0) + " kg</td>" +
-        "<td><span class='pill " + statusCls + "'>" + statusTxt + "</span></td>" +
-        "</tr>";
+    document.getElementById("idle-tbody").innerHTML = worstIdle.slice(0,10).map(v => {
+      const color = v.idlePct > 28 ? "#D13438" : v.idlePct > 16 ? "#FFB900" : "#107C10";
+      const cls   = v.idlePct > 28 ? "pill-red" : v.idlePct > 16 ? "pill-orange" : "pill-green";
+      const txt   = v.idlePct > 28 ? "Critical" : v.idlePct > 16 ? "High" : "Normal";
+      return `<tr>
+        <td><strong>${v.name}</strong></td>
+        <td>${fmt(v.idleHrs,1)} h</td>
+        <td class="idle-bar-cell">${progressBar(v.idlePct, color)}</td>
+        <td>${fmt(v.idleFuelPct,1)}%</td>
+        <td>${fmt(v.idleFuel,0)} L</td>
+        <td>${fmt(v.co2IdleKg,0)} kg</td>
+        <td><span class="pill ${cls}">${txt}</span></td>
+        <td><button class="detail-btn" data-id="${v.id}">📊</button></td>
+      </tr>`;
     }).join("");
 
-    // ── EV table ───────────────────────────────────────────
-    var annualSavingT = evReady.reduce(function (s, v) { return s + v.co2Kg; }, 0) / 1000 * 12 * 0.85;
-    document.getElementById("ev-saving-pill").textContent =
-      "~" + fmt(annualSavingT, 0) + " t CO₂ avoided/yr if switched";
+    const evSorted = [...vehicles].sort((a,b)=>b.evScore - a.evScore).slice(0,10);
+    document.getElementById("ev-tbody").innerHTML = evSorted.map(v => {
+      const [txt, cls] = verdict(v.evScore);
+      const color = v.evScore >= 72 ? "#107C10" : v.evScore >= 55 ? "#0078D4" : v.evScore >= 38 ? "#FFB900" : "#D13438";
+      return `<tr>
+        <td><strong>${v.name}</strong></td>
+        <td>${fmt(v.avgDailyKm,0)} km</td>
+        <td>${fmt(v.tripsDay,1)}</td>
+        <td>${fmt(v.idlePct,1)}%</td>
+        <td>${v.harshPenaltyPct > 0.1 ? fmt(v.harshPenaltyPct,1) + "%" : "—"}</td>
+        <td>${progressBar(v.evScore, color)}</td>
+        <td><span class="pill ${cls}">${txt}</span></td>
+        <td><button class="ask-ice-btn" data-ev-id="${v.id}">🤖 Ask AI</button></td>
+      </tr>`;
+    }).join("");
 
+    const avgKmReady = evReady.length ? evReady.reduce((s,v)=>s+v.avgDailyKm,0)/evReady.length : 0;
     document.getElementById("ev-highlight").innerHTML =
-      '<span class="icon">⚡</span>' +
-      '<strong>' + evCount + ' vehicles</strong> are strong EV candidates. ' +
-      'They average <strong>' +
-      fmt(evReady.reduce(function(s,v){return s+v.avgDailyKm;},0)/(evReady.length||1), 0) +
-      ' km/day</strong> — well within EV range. ' +
-      'High idle means they waste most fuel at standstill: exactly where EVs excel.';
+      `<span class="icon">⚡</span>
+      <strong>${evCount} vehicle${evCount===1?"":"s"}</strong> look like strong EV candidates.<br>
+      Avg <strong>${fmt(avgKmReady,0)} km/day</strong> — well inside typical EV range.<br>
+      High idle % makes them especially attractive for electrification.`;
 
-    var evSorted = vehicles.slice().sort(function (a, b) { return b.evScore - a.evScore; }).slice(0, 10);
-    document.getElementById("ev-tbody").innerHTML = evSorted.map(function (v) {
-      var verdict = evVerdict(v.evScore);
-      var scoreColor = v.evScore >= 75 ? "#107C10" : v.evScore >= 55 ? "#0078D4" : v.evScore >= 40 ? "#7A4F00" : "#D13438";
-      return "<tr>" +
-        "<td><strong>" + v.name + "</strong></td>" +
-        "<td>" + fmt(v.avgDailyKm, 0) + " km</td>" +
-        "<td>" + fmt(v.tripsPerDay, 1) + "</td>" +
-        "<td>" + fmt(v.idlePct, 1) + "%</td>" +
-        "<td>" +
-          '<div class="progress-wrap">' +
-          '<div class="progress-bg"><div class="progress-fill" style="width:' + v.evScore + '%;background:' + scoreColor + '"></div></div>' +
-          '<span class="progress-label" style="color:' + scoreColor + ';font-weight:600">' + v.evScore + '</span>' +
-          '</div>' +
-        "</td>" +
-        "<td><span class='pill " + verdict[1] + "'>" + verdict[0] + "</span></td>" +
-        "</tr>";
-    }).join("");
+    document.getElementById("ev-saving-pill").textContent = `~${fmt(potYearCO2,0)} t CO₂/yr avoided if switched`;
 
-    // ── Show content ───────────────────────────────────────
+    // Update map if open
+    if (document.getElementById('map').classList.contains('active-tab')) {
+      if (!map) initMap();
+      updateMapMarkers(tripsData);
+    }
+
+    bindDetailButtons();
     document.getElementById("loading").style.display = "none";
     document.getElementById("content").style.display = "block";
   }
 
-  return {
-    initialize: function (api, state, callback) {
-      api.getSession(function (session) {
-        document.getElementById("db-label").textContent = session.database || "—";
+
+  // ── Map init ─────────────────────────────────────────────────
+  function initMap() {
+    if (!window.L) {
+      document.getElementById('leaflet-map').innerHTML =
+        '<div style="padding:40px;text-align:center;color:#605E5C">Leaflet not loaded</div>';
+      return;
+    }
+    map = L.map('leaflet-map').setView([39.5, -98.35], 4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors', maxZoom: 18
+    }).addTo(map);
+    longStopLayer  = L.layerGroup().addTo(map);
+    nightStopLayer = L.layerGroup().addTo(map);
+    evLayer        = L.layerGroup().addTo(map);
+    document.getElementById('filter-long').addEventListener('click', function() {
+      this.classList.toggle('active');
+      this.classList.contains('active') ? map.addLayer(longStopLayer) : map.removeLayer(longStopLayer);
+    });
+    document.getElementById('filter-night').addEventListener('click', function() {
+      this.classList.toggle('active');
+      this.classList.contains('active') ? map.addLayer(nightStopLayer) : map.removeLayer(nightStopLayer);
+    });
+    document.getElementById('filter-ev').addEventListener('click', function() {
+      this.classList.toggle('active');
+      this.classList.contains('active') ? map.addLayer(evLayer) : map.removeLayer(evLayer);
+    });
+  }
+
+  function showMapBanner(msg) {
+    const old = document.getElementById('map-banner');
+    if (old) old.remove();
+    document.getElementById('leaflet-map').insertAdjacentHTML('afterbegin',
+      '<div id="map-banner" style="position:absolute;top:12px;left:50%;transform:translateX(-50%);' +
+      'z-index:999;background:#fff;border:1px solid #C8C6C4;border-radius:4px;' +
+      'padding:8px 16px;font-size:13px;color:#605E5C;white-space:nowrap">' + msg + '</div>');
+  }
+
+  function updateMapMarkers(trips) {
+    if (!map || !window.L || !api) return;
+    longStopLayer.clearLayers();
+    nightStopLayer.clearLayers();
+    evLayer.clearLayers();
+    showMapBanner('⏳ Loading stop locations via LogRecord...');
+
+    const byVeh = {};
+    trips.forEach(function(t) {
+      const id = t.device && t.device.id;
+      if (!id) return;
+      if (!byVeh[id]) byVeh[id] = [];
+      byVeh[id].push(t);
+    });
+
+    const chargingCandidates = [], nightCandidates = [];
+    Object.entries(byVeh).forEach(function([id, vTrips]) {
+      vTrips.sort(function(a,b){ return new Date(a.stop||a.start) - new Date(b.stop||b.start); });
+      for (let i = 0; i < vTrips.length - 1; i++) {
+        const t1 = vTrips[i], t2 = vTrips[i+1];
+        if (!t1.stop || !t2.start) continue;
+        const stopDt = new Date(t1.stop), startDt = new Date(t2.start);
+        const gapMin = (startDt - stopDt) / 60000;
+        if (gapMin < 25) continue;
+        const vehName = (vehicles.find(function(v){ return v.id === id; }) || {}).name || id;
+        const stopH = stopDt.getHours(), startH = startDt.getHours();
+        const isNight = gapMin >= 300 && stopH >= 16 && startH <= 9;
+        if (isNight) {
+          nightCandidates.push({deviceId:id, vehName, stopTime:t1.stop, gapMin});
+        } else if (gapMin >= 30 && gapMin <= 90) {
+          chargingCandidates.push({deviceId:id, vehName, stopTime:t1.stop, gapMin});
+        }
+      }
+    });
+
+    chargingCandidates.sort(function(a,b){ return b.gapMin - a.gapMin; });
+    nightCandidates.sort(function(a,b){ return b.gapMin - a.gapMin; });
+    const sample = chargingCandidates.slice(0,60).map(function(s){ return Object.assign({type:'charging'},s); })
+      .concat(nightCandidates.slice(0,40).map(function(s){ return Object.assign({type:'night'},s); }));
+
+    if (sample.length === 0) {
+      showMapBanner('💡 No qualifying stops — try a longer date range');
+      return;
+    }
+
+    let done = 0;
+    const allCoords = [];
+
+    sample.forEach(function(stop) {
+      const fromDt = new Date(new Date(stop.stopTime).getTime() - 4*60000).toISOString();
+      api.call("Get", {
+        typeName: "LogRecord",
+        search: { deviceSearch:{id:stop.deviceId}, fromDate:fromDt, toDate:stop.stopTime },
+        resultsLimit: 5
+      }, function(logs) {
+        if (logs && logs.length > 0) {
+          const log = logs[logs.length-1];
+          const lat = log.latitude, lng = log.longitude;
+          if (Math.abs(lat) > 0.01 && Math.abs(lng) > 0.01) {
+            allCoords.push([lat, lng]);
+            const timeStr = new Date(stop.stopTime).toLocaleString(undefined,
+              {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+            const popup = '<strong>' + stop.vehName + '</strong><br>' +
+              (stop.type==='night' ? '🌙 Night stop' : '⏱ Charging stop') +
+              ': <strong>' + Math.round(stop.gapMin) + ' min</strong><br>' + timeStr;
+            if (stop.type === 'charging') {
+              L.circleMarker([lat,lng],{radius:8,color:'#FFB900',fillColor:'#FFB900',fillOpacity:0.82,weight:2})
+               .bindPopup(popup).addTo(longStopLayer);
+            } else {
+              L.circleMarker([lat,lng],{radius:8,color:'#8764B8',fillColor:'#8764B8',fillOpacity:0.82,weight:2})
+               .bindPopup(popup).addTo(nightStopLayer);
+            }
+          }
+        }
+        done++;
+        if (done === sample.length) onAllDone();
+      }, function() { done++; if (done === sample.length) onAllDone(); });
+    });
+
+    function onAllDone() {
+      const placed = longStopLayer.getLayers().length + nightStopLayer.getLayers().length;
+      const banner = document.getElementById('map-banner');
+      if (placed === 0) {
+        showMapBanner('💡 No GPS stop coords found — LogRecord data may be sparse');
+      } else {
+        if (banner) banner.remove();
+      }
+      if (allCoords.length > 1) {
+        map.fitBounds(L.latLngBounds(allCoords), {padding:[50,50]});
+      }
+      if (allCoords.length > 0) {
+        const cLat = allCoords.reduce(function(s,c){return s+c[0];},0)/allCoords.length;
+        const cLng = allCoords.reduce(function(s,c){return s+c[1];},0)/allCoords.length;
+        loadEVChargers(cLat, cLng);
+      }
+    }
+  }
+
+  function loadEVChargers(lat, lng) {
+    // Static pre-generated file in repo — avoids Osano/CSP blocking
+    fetch('https://pokoboe.github.io/fleetflea/ev-chargers.json')
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        evLayer.clearLayers();
+        if (!data || !data.length) {
+          showMapBanner('⚡ Run fetch_chargers.py locally and commit ev-chargers.json');
+          return;
+        }
+        const toRad = function(d){ return d*Math.PI/180; };
+        function distKm(la1,lo1,la2,lo2) {
+          const dLat=toRad(la2-la1), dLng=toRad(lo2-lo1);
+          const a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(toRad(la1))*Math.cos(toRad(la2))*Math.sin(dLng/2)*Math.sin(dLng/2);
+          return 6371*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+        }
+        let shown = 0;
+        data.forEach(function(s) {
+          if (distKm(lat,lng,s.lat,s.lng) > 130) return;
+          const popup = '<strong>⚡ ' + s.name + '</strong><br>' +
+            (s.address ? s.address+'<br>' : '') +
+            s.connectors+' connector'+(s.connectors!==1?'s':'')+
+            (s.powerKW?' · '+s.powerKW+' kW':'');
+          const evIcon = L.divIcon({
+            className: '',
+            html: '<div style="width:22px;height:22px;background:#107C10;border-radius:50%;border:2px solid #fff;' +
+                  'box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center">' +
+                  '<svg viewBox="0 0 24 24" width="12" height="12" fill="#fff">' +
+                  '<path d="M13 2L4.5 13.5H11L10 22L20.5 10.5H14L13 2Z"/></svg></div>',
+            iconSize: [22,22], iconAnchor: [11,11], popupAnchor: [0,-12]
+          });
+          L.marker([s.lat,s.lng], {icon:evIcon}).bindPopup(popup).addTo(evLayer);
+          shown++;
+        });
+        if (shown===0) showMapBanner('⚡ No EV chargers in dataset near fleet area');
+      })
+      .catch(function() {
+        showMapBanner('⚡ ev-chargers.json missing — run fetch_chargers.py and commit');
       });
-      run(api);
+  }
+
+  // ── Detail modal (chart per vehicle) ─────────────────────────
+  function bindDetailButtons() {
+    document.querySelectorAll('.detail-btn').forEach(function(btn) {
+      btn.onclick = function() {
+        const id = btn.dataset.id;
+        const vehicle = vehicles.find(function(v){ return v.id===id; });
+        if (!vehicle) return;
+        document.getElementById('modal-vehicle-name').textContent = vehicle.name;
+        const daysArr = Object.keys(dailyDataMap[id]||{}).sort();
+        const engineOnData    = daysArr.map(function(d){
+          const dd=dailyDataMap[id][d];
+          return (dd.idleSec+dd.driveSec)>0 ? dd.idleSec/(dd.idleSec+dd.driveSec)*100 : 0;
+        });
+        const idleFuelPctData = daysArr.map(function(d){
+          const dd=dailyDataMap[id][d];
+          return dd.totalFuelL>0 ? dd.idleFuelL/dd.totalFuelL*100 : 0;
+        });
+        const fuelWastedData  = daysArr.map(function(d){ return dailyDataMap[id][d].idleFuelL; });
+
+        if (window._activeChart) { window._activeChart.destroy(); window._activeChart=null; }
+
+        window._activeChart = new Chart(document.getElementById('chart-combined'), {
+          type:'line',
+          data:{
+            labels:daysArr,
+            datasets:[
+              {label:'Idle % of engine-on',data:engineOnData,borderColor:'#FFB900',
+               backgroundColor:'rgba(255,185,0,.10)',fill:true,tension:0.35,pointRadius:3,yAxisID:'yPct'},
+              {label:'Idle fuel % of total',data:idleFuelPctData,borderColor:'#D13438',
+               backgroundColor:'rgba(209,52,56,.07)',fill:true,tension:0.35,pointRadius:3,yAxisID:'yPct'},
+              {label:'Idle fuel wasted (L)',data:fuelWastedData,borderColor:'#0078D4',
+               fill:false,tension:0.35,pointRadius:3,borderDash:[5,3],yAxisID:'yL'}
+            ]
+          },
+          options:{
+            responsive:true,maintainAspectRatio:false,
+            interaction:{mode:'index',intersect:false},
+            plugins:{
+              legend:{display:true,position:'bottom',
+                labels:{font:{family:"'Segoe UI',sans-serif",size:12},color:'#605E5C',padding:20,usePointStyle:true}},
+              tooltip:{backgroundColor:'#fff',borderColor:'#C8C6C4',borderWidth:1,
+                titleColor:'#201F1E',bodyColor:'#605E5C',padding:10,
+                callbacks:{label:function(ctx){
+                  return ctx.datasetIndex<2
+                    ? ' '+ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+'%'
+                    : ' '+ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+' L';
+                }}}
+            },
+            scales:{
+              x:{grid:{color:'#EDEBE9'},ticks:{font:{size:11},color:'#605E5C',maxRotation:45}},
+              yPct:{type:'linear',position:'left',grid:{color:'#EDEBE9'},
+                ticks:{font:{size:11},color:'#605E5C',callback:function(v){return v+'%'}},
+                title:{display:true,text:'% of time / fuel',font:{size:11},color:'#605E5C'}},
+              yL:{type:'linear',position:'right',grid:{drawOnChartArea:false},
+                ticks:{font:{size:11},color:'#0078D4',callback:function(v){return v+' L'}},
+                title:{display:true,text:'Litres wasted',font:{size:11},color:'#0078D4'}}
+            }
+          }
+        });
+        document.getElementById('vehicle-modal').style.display='flex';
+      };
+    });
+    document.getElementById('modal-close').onclick = function() {
+      document.getElementById('vehicle-modal').style.display='none';
+    };
+
+    // Ask AI (ICE analysis) buttons
+    document.querySelectorAll('.ask-ice-btn').forEach(function(btn) {
+      btn.onclick = function() {
+        const id = btn.dataset.evId;
+        const v = vehicles.find(function(x){ return x.id===id; });
+        if (!v) return;
+
+        document.getElementById('ice-modal-title').textContent = '🤖 EV Transition: ' + v.name;
+        document.getElementById('ice-modal-subtitle').textContent =
+          'Score ' + v.evScore + '/100 · ' + Math.round(v.avgDailyKm) + ' km/day · ' + v.idlePct.toFixed(1) + '% idle';
+        document.getElementById('ice-response').textContent = '';
+        document.getElementById('ice-loading').style.display = 'flex';
+        document.getElementById('ice-modal').style.display = 'flex';
+
+        const prompt = `You are a fleet electrification advisor. Analyze this specific vehicle and give a direct, data-driven recommendation.
+
+Vehicle: ${v.name}
+Period analyzed: last ${days} days
+
+Key metrics:
+- EV Readiness Score: ${v.evScore}/100
+- Average daily distance: ${Math.round(v.avgDailyKm)} km/day
+- Trips per day: ${v.tripsDay.toFixed(1)}
+- Idle time: ${v.idlePct.toFixed(1)}% of engine-on time
+- Total idle fuel wasted: ${Math.round(v.idleFuel)} L over ${days} days
+- CO₂ from idle alone: ${Math.round(v.co2IdleKg)} kg
+- Total estimated CO₂: ${Math.round(v.co2Kg)} kg
+
+Answer these questions concisely:
+1. Is this vehicle a strong EV candidate? Why?
+2. What type of EV would fit (range requirement, charging speed needed)?
+3. What is the estimated annual CO₂ saving if switched to EV?
+4. What is the biggest risk or blocker for this specific vehicle?
+5. One concrete next action the fleet manager should take.
+
+Be specific, use the numbers above, keep each answer to 2-3 sentences.`;
+
+        fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1000,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          document.getElementById('ice-loading').style.display='none';
+          const text = (data.content||[]).map(function(c){ return c.text||''; }).join('');
+          document.getElementById('ice-response').textContent = text || 'No response received.';
+        })
+        .catch(function(err){
+          document.getElementById('ice-loading').style.display='none';
+          document.getElementById('ice-response').textContent = '⚠️ Could not reach Claude API: ' + err;
+        });
+      };
+    });
+
+    document.getElementById('ice-modal-close').onclick = function() {
+      document.getElementById('ice-modal').style.display='none';
+    };
+  }
+
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active-tab'));
+      document.getElementById(btn.dataset.tab).classList.add('active-tab');
+
+      if (btn.dataset.tab === 'map') {
+        if (!map) initMap();
+        if (tripsData && tripsData.length > 0) updateMapMarkers(tripsData);
+      }
+    });
+  });
+
+  return {
+    initialize: function (addinApi, state, callback) {
+      api = addinApi;
+
+      api.getSession(s => {
+        document.getElementById("db-label").textContent = s.database || "—";
+      });
+
+      document.getElementById("range-select").addEventListener("change", function (e) {
+        const selectedDays = parseInt(e.target.value);
+        run(selectedDays);
+      });
+
+      run(30);
       callback();
     },
-    focus: function (api, state) {
-      // intentionally no-op: data loaded once on initialize
-      // re-running on focus would cause "Add-In threw error" on WebSocket reconnect
-    },
-    blur: function (api, state) {}
+    focus: function (addinApi, state) { /* no-op — loaded on initialize */ },
+    blur: () => {}
   };
 };
+})();
 </script>
 </body>
 </html>

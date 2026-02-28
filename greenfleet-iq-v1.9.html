@@ -143,7 +143,7 @@
       </div>
 
       <div class="footer">
-        GreenFleet IQ v1.9 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
+        GreenFleet IQ v2.0 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
       </div>
 
     </div>
@@ -165,10 +165,11 @@
 
   <div id="vehicle-modal" class="modal" style="display:none">
     <div class="modal-content">
-      <button class="modal-close-btn" id="modal-close">×</button>
-      <div class="modal-vehicle-title" id="modal-vehicle-name"></div>
-      <div class="modal-subtitle">Daily idle breakdown — trends over selected period</div>
-      <div class="chart-wrap"><canvas id="chart-combined"></canvas></div>
+      <span class="close" id="modal-close">×</span>
+      <h2 id="modal-vehicle-name"></h2>
+      <canvas id="chart-engine-on" height="120"></canvas>
+      <canvas id="chart-idle-fuel-pct" height="120"></canvas>
+      <canvas id="chart-fuel-wasted" height="120"></canvas>
     </div>
   </div>
 
@@ -178,13 +179,13 @@
 
 // Constants
 const CO2_KG_PER_L_GASOLINE = 2.32;
-const CO2_KG_PER_L_DIESEL   = 2.697;
-const FUEL_L_PER_100KM      = 10.0;
-const IDLE_L_PER_HOUR       = 0.80;
-const RESULTS_LIMIT         = 50000;
+const CO2_KG_PER_L_DIESEL = 2.697;
+const FUEL_L_PER_100KM = 10.0;
+const IDLE_L_PER_HOUR = 0.80;
+const RESULTS_LIMIT = 50000;
 
 const HARSH_THRESHOLD_PER_100KM = 4;
-const MAX_PENALTY_PCT           = 0.25;
+const MAX_PENALTY_PCT = 0.25;
 
 // Helpers
 const fmt = (n, dec = 0) => isNaN(n) || n == null ? "—" : Number(n).toLocaleString(undefined, {maximumFractionDigits: dec});
@@ -226,18 +227,6 @@ function progressBar(pct, color) {
   </div>`;
 }
 
-function parseDur(d) {
-  if (!d) return 0;
-  if (typeof d === "number") return d;
-  if (d.totalSeconds != null) return d.totalSeconds;
-  if (d.ticks != null) return d.ticks / 1e7;
-  if (typeof d === "string") {
-    const p = d.split(":");
-    if (p.length === 3) return (+p[0])*3600 + (+p[1])*60 + +p[2];
-  }
-  return 0;
-}
-
 // Main logic
 geotab.addin["greenfleet-iq"] = () => {
   let api;
@@ -276,7 +265,7 @@ geotab.addin["greenfleet-iq"] = () => {
         search: { fromDate: from.toISOString(), toDate: now.toISOString() },
         resultsLimit: RESULTS_LIMIT
       }, trips => {
-        tripsData = trips;  // save for map
+        tripsData = trips;
 
         api.call("Get", {
           typeName: "ExceptionEvent",
@@ -332,19 +321,18 @@ geotab.addin["greenfleet-iq"] = () => {
         v.fuelUsedL += Number(t.fuelUsed.value);
       }
 
-      // Daily aggregation for modal chart
-      const day = (t.start || '').slice(0, 10) || 'unknown';
-      if (!dailyDataMap[id])       dailyDataMap[id] = {};
-      if (!dailyDataMap[id][day])  dailyDataMap[id][day] = { idleSec:0, driveSec:0, idleFuelL:0, totalFuelL:0 };
+      // Daily data
+      const day = t.start?.slice(0,10) || '';
+      if (!dailyDataMap[id]) dailyDataMap[id] = {};
+      if (!dailyDataMap[id][day]) dailyDataMap[id][day] = {idleSec:0, driveSec:0, idleFuelL:0, totalFuelL:0};
+
       const dd = dailyDataMap[id][day];
-      const durIdle  = parseDur(t.idlingDuration);
-      const durDrive = parseDur(t.drivingDuration);
-      const tripKm   = (t.distance || 0) * kmFactor;
-      const tripFuel = t.fuelUsed?.value ? Number(t.fuelUsed.value) : tripKm * (FUEL_L_PER_100KM / 100);
-      dd.idleSec   += durIdle;
-      dd.driveSec  += durDrive;
-      dd.idleFuelL += (durIdle / 3600) * IDLE_L_PER_HOUR;
-      dd.totalFuelL += tripFuel + (durIdle / 3600) * IDLE_L_PER_HOUR;
+      dd.idleSec += parseDur(t.idlingDuration);
+      dd.driveSec += parseDur(t.drivingDuration);
+
+      let drivingFuelL = t.fuelUsed?.value && !isNaN(t.fuelUsed.value) ? Number(t.fuelUsed.value) : ((t.distance||0) * kmFactor * (FUEL_L_PER_100KM / 100));
+      dd.idleFuelL += (parseDur(t.idlingDuration) / 3600) * IDLE_L_PER_HOUR;
+      dd.totalFuelL += drivingFuelL;
     });
 
     const harshKeywords = ["HarshAcceleration", "HarshBrake", "HarshCornering"];
@@ -414,7 +402,7 @@ geotab.addin["greenfleet-iq"] = () => {
     document.getElementById("kpi-ev-insight").innerHTML =
       `Switching could avoid <strong>${fmt(potYearCO2,0)} t CO₂/year</strong>`;
 
-    const worstIdle = [...vehicles].sort((a,b)=>b.idlePct - a.idlePct);
+    const worstIdle = [...vehicles].sort((a,b)=>b.idleHrs - a.idleHrs);
 
     document.getElementById("idle-fleet-pct").textContent = fmt(fleetIdlePct,1) + "% fleet idle";
 
@@ -469,361 +457,57 @@ geotab.addin["greenfleet-iq"] = () => {
       updateMapMarkers(tripsData);
     }
 
-    bindDetailButtons();
-
     document.getElementById("loading").style.display = "none";
     document.getElementById("content").style.display = "block";
   }
 
-
-  // ── Map init ────────────────────────────────────────────────
-  function initMap() {
-    if (!window.L) {
-      document.getElementById('leaflet-map').innerHTML =
-        '<div style="padding:40px;text-align:center;color:#605E5C">Leaflet not loaded — add lib/leaflet.js to repo</div>';
-      return;
-    }
-    map = L.map('leaflet-map').setView([39.5, -98.35], 4);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-      maxZoom: 18
-    }).addTo(map);
-    longStopLayer  = L.layerGroup().addTo(map);
-    nightStopLayer = L.layerGroup().addTo(map);
-    evLayer        = L.layerGroup().addTo(map);
-
-    // Filter toggles
-    document.getElementById('filter-long').addEventListener('click', function() {
-      this.classList.toggle('active');
-      this.classList.contains('active') ? map.addLayer(longStopLayer) : map.removeLayer(longStopLayer);
-    });
-    document.getElementById('filter-night').addEventListener('click', function() {
-      this.classList.toggle('active');
-      this.classList.contains('active') ? map.addLayer(nightStopLayer) : map.removeLayer(nightStopLayer);
-    });
-    document.getElementById('filter-ev').addEventListener('click', function() {
-      this.classList.toggle('active');
-      this.classList.contains('active') ? map.addLayer(evLayer) : map.removeLayer(evLayer);
-    });
-  }
-
-  function updateMapMarkers(trips) {
-    if (!map || !window.L || !api) return;
-    longStopLayer.clearLayers();
-    nightStopLayer.clearLayers();
-    evLayer.clearLayers();
-
-    const oldBanner = document.getElementById('map-banner');
-    if (oldBanner) oldBanner.remove();
-
-    showMapBanner('⏳ Loading stop locations via LogRecord...');
-
-    // ── Build stop candidates from trip gaps ─────────────────
-    // gapMin 25–480 = plausible stop (not noise, not overnight multi-day)
-    const byVeh = {};
-    trips.forEach(t => {
-      const id = t.device?.id;
-      if (!id) return;
-      if (!byVeh[id]) byVeh[id] = [];
-      byVeh[id].push(t);
-    });
-
-    // Two categories:
-    // CHARGING stops: 30–90 min (long enough to charge, short enough to be intentional)
-    // NIGHT stops: gap spans midnight AND > 5 hours (parked overnight = home charging opportunity)
-    const chargingCandidates = [];
-    const nightCandidates    = [];
-
-    Object.entries(byVeh).forEach(([id, vTrips]) => {
-      vTrips.sort((a, b) => new Date(a.stop || a.start) - new Date(b.stop || b.start));
-      for (let i = 0; i < vTrips.length - 1; i++) {
-        const t1 = vTrips[i], t2 = vTrips[i + 1];
-        if (!t1.stop || !t2.start) continue;
-        const stopDt  = new Date(t1.stop);
-        const startDt = new Date(t2.start);
-        const gapMin  = (startDt - stopDt) / 60000;
-        if (gapMin < 25) continue;
-
-        const vehName = vehicles.find(v => v.id === id)?.name || id;
-
-        const isNight = (() => {
-          // Spans midnight: stop before 23:00, resume after 05:00, gap > 5h
-          if (gapMin < 300) return false;
-          const stopH  = stopDt.getHours();
-          const startH = startDt.getHours();
-          return stopH >= 16 && startH <= 9; // parked evening, left morning
-        })();
-
-        if (isNight) {
-          nightCandidates.push({ deviceId: id, vehName, stopTime: t1.stop, gapMin });
-        } else if (gapMin >= 30 && gapMin <= 90) {
-          chargingCandidates.push({ deviceId: id, vehName, stopTime: t1.stop, gapMin });
-        }
-      }
-    });
-
-    // Sample top 60 charging + top 40 night stops for LogRecord
-    chargingCandidates.sort((a, b) => b.gapMin - a.gapMin);
-    nightCandidates.sort((a, b) => b.gapMin - a.gapMin);
-    const sample = [
-      ...chargingCandidates.slice(0, 60).map(s => ({ ...s, type: 'charging' })),
-      ...nightCandidates.slice(0, 40).map(s => ({ ...s, type: 'night' }))
-    ];
-
-    if (sample.length === 0) {
-      showMapBanner('💡 No qualifying stops in this period — try a longer date range');
-      return;
-    }
-
-    // ── LogRecord lookup per stop ────────────────────────────
-    let done = 0;
-    const allCoords = []; // for fitBounds
-
-    sample.forEach(stop => {
-      const fromDt = new Date(new Date(stop.stopTime).getTime() - 4 * 60000).toISOString();
-      api.call("Get", {
-        typeName: "LogRecord",
-        search: {
-          deviceSearch: { id: stop.deviceId },
-          fromDate: fromDt,
-          toDate:   stop.stopTime
-        },
-        resultsLimit: 5
-      }, function(logs) {
-        if (logs && logs.length > 0) {
-          const log = logs[logs.length - 1];
-          const lat = log.latitude, lng = log.longitude;
-          if (Math.abs(lat) > 0.01 && Math.abs(lng) > 0.01) {
-            allCoords.push([lat, lng]);
-            const timeStr = new Date(stop.stopTime).toLocaleString(undefined,
-              { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            const popup = `<strong>${stop.vehName}</strong><br>` +
-                          `${stop.type === 'night' ? '🌙 Night stop' : '⏱ Charging stop'}: ` +
-                          `<strong>${Math.round(stop.gapMin)} min</strong><br>` +
-                          `${timeStr}`;
-
-            if (stop.type === 'charging') {
-              L.circleMarker([lat, lng], {
-                radius: 8, color: '#FFB900', fillColor: '#FFB900',
-                fillOpacity: 0.82, weight: 2
-              }).bindPopup(popup).addTo(longStopLayer);
-            } else {
-              L.circleMarker([lat, lng], {
-                radius: 8, color: '#8764B8', fillColor: '#8764B8',
-                fillOpacity: 0.82, weight: 2
-              }).bindPopup(popup).addTo(nightStopLayer);
-            }
-          }
-        }
-        done++;
-        if (done === sample.length) onAllDone();
-      }, function() {
-        done++;
-        if (done === sample.length) onAllDone();
-      });
-    });
-
-    // ── After LogRecord done: load EV chargers ───────────────
-    function onAllDone() {
-      const banner = document.getElementById('map-banner');
-      const chargingCount = longStopLayer.getLayers().length;
-      const nightCount    = nightStopLayer.getLayers().length;
-
-      if (chargingCount === 0 && nightCount === 0) {
-        showMapBanner('💡 No stop coordinates in LogRecord — GPS data may be sparse');
-      } else {
-        if (banner) banner.remove();
-      }
-
-      // Auto-fit to stops
-      if (allCoords.length > 1) {
-        map.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50] });
-      }
-
-      // Load EV chargers around fleet stops centroid
-      if (allCoords.length === 0) return;
-      const centerLat = allCoords.reduce((s, c) => s + c[0], 0) / allCoords.length;
-      const centerLng = allCoords.reduce((s, c) => s + c[1], 0) / allCoords.length;
-      loadEVChargers(centerLat, centerLng);
-    }
-  }
-
-  function showMapBanner(msg) {
-    const oldBanner = document.getElementById('map-banner');
-    if (oldBanner) oldBanner.remove();
-    document.getElementById('leaflet-map').insertAdjacentHTML('afterbegin',
-      '<div id="map-banner" style="position:absolute;top:12px;left:50%;' +
-      'transform:translateX(-50%);z-index:999;background:#fff;' +
-      'border:1px solid #C8C6C4;border-radius:4px;' +
-      'padding:8px 16px;font-size:13px;color:#605E5C;white-space:nowrap">' +
-      msg + '</div>');
-  }
-
-  function loadEVChargers(lat, lng) {
-    // OpenChargeMap — JSONP to bypass CSP/iframe fetch restrictions
-    const cbName = 'ocmCallback_' + Date.now();
-    const script = document.createElement('script');
-
-    window[cbName] = function(data) {
-      // cleanup
-      delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
-
-      evLayer.clearLayers();
-      if (!data || !data.length) {
-        showMapBanner('⚡ No EV chargers found in this area');
-        return;
-      }
-      data.forEach(station => {
-        const sLat = station.AddressInfo && station.AddressInfo.Latitude;
-        const sLng = station.AddressInfo && station.AddressInfo.Longitude;
-        if (!sLat || !sLng) return;
-        const name    = (station.AddressInfo && station.AddressInfo.Title) || 'EV Charger';
-        const address = (station.AddressInfo && station.AddressInfo.AddressLine1) || '';
-        const connectors = station.NumberOfPoints || '?';
-        const conn0   = station.Connections && station.Connections[0];
-        const power   = conn0 && conn0.PowerKW;
-        const popup   = '<strong>⚡ ' + name + '</strong><br>' +
-                        (address ? address + '<br>' : '') +
-                        connectors + ' connector' + (connectors !== 1 ? 's' : '') +
-                        (power ? ' · ' + power + ' kW' : '');
-        L.circleMarker([sLat, sLng], {
-          radius: 7, color: '#107C10', fillColor: '#107C10',
-          fillOpacity: 0.82, weight: 2
-        }).bindPopup(popup).addTo(evLayer);
-      });
-    };
-
-    script.onerror = function() {
-      delete window[cbName];
-      showMapBanner('⚡ EV charger data unavailable (network blocked)');
-    };
-
-    // 60s timeout fallback
-    const timer = setTimeout(function() {
-      if (window[cbName]) {
-        delete window[cbName];
-        showMapBanner('⚡ EV charger request timed out');
-      }
-    }, 60000);
-
-    script.src = 'https://api.openchargemap.io/v3/poi/?output=json' +
-      '&callback=' + cbName +
-      '&key=f15be0f9-2486-4438-8e59-2c460ae291ea' +
-      '&latitude=' + lat + '&longitude=' + lng +
-      '&distance=50&distanceunit=Miles' +
-      '&maxresults=40&compact=true&verbose=false';
-
-    document.head.appendChild(script);
-  }
-
-
-  // ── Detail button (chart modal) ─────────────────────────────
-  function bindDetailButtons() {
-    document.querySelectorAll('.detail-btn').forEach(btn => {
-      btn.onclick = () => {
-        const id = btn.dataset.id;
-        const vehicle = vehicles.find(v => v.id === id);
-        if (!vehicle) return;
-
-        document.getElementById('modal-vehicle-name').textContent = vehicle.name;
-
-        const daysArr = Object.keys(dailyDataMap[id] || {}).sort();
-        const engineOnData   = daysArr.map(d => {
-          const dd = dailyDataMap[id][d];
-          return (dd.idleSec + dd.driveSec) > 0
-            ? dd.idleSec / (dd.idleSec + dd.driveSec) * 100 : 0;
-        });
-        const idleFuelPctData = daysArr.map(d => {
-          const dd = dailyDataMap[id][d];
-          return dd.totalFuelL > 0 ? dd.idleFuelL / dd.totalFuelL * 100 : 0;
-        });
-        const fuelWastedData  = daysArr.map(d => dailyDataMap[id][d].idleFuelL);
-
-        currentCharts.forEach(c => c && c.destroy());
-        currentCharts = [];
-
-        currentCharts.push(new Chart(document.getElementById('chart-combined'), {
-          type: 'line',
-          data: {
-            labels: daysArr,
-            datasets: [
-              {
-                label: 'Idle % of engine-on time',
-                data: engineOnData,
-                borderColor: '#FFB900', backgroundColor: 'rgba(255,185,0,.10)',
-                fill: true, tension: 0.35, pointRadius: 3, pointHoverRadius: 5,
-                yAxisID: 'yPct'
-              },
-              {
-                label: 'Idle fuel % of total fuel',
-                data: idleFuelPctData,
-                borderColor: '#D13438', backgroundColor: 'rgba(209,52,56,.07)',
-                fill: true, tension: 0.35, pointRadius: 3, pointHoverRadius: 5,
-                yAxisID: 'yPct'
-              },
-              {
-                label: 'Idle fuel wasted (L)',
-                data: fuelWastedData,
-                borderColor: '#0078D4', backgroundColor: 'rgba(0,120,212,.07)',
-                fill: false, tension: 0.35, pointRadius: 3, pointHoverRadius: 5,
-                borderDash: [5,3], yAxisID: 'yL'
-              }
-            ]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-              legend: {
-                display: true, position: 'bottom',
-                labels: { font: { family: "'Segoe UI', sans-serif", size: 12 },
-                          color: '#605E5C', padding: 20, usePointStyle: true }
-              },
-              tooltip: {
-                backgroundColor: '#fff', borderColor: '#C8C6C4', borderWidth: 1,
-                titleColor: '#201F1E', bodyColor: '#605E5C', padding: 10,
-                callbacks: { label: ctx => ctx.datasetIndex < 2
-                  ? ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`
-                  : ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} L` }
-              }
-            },
-            scales: {
-              x: { grid: { color: '#EDEBE9' },
-                   ticks: { font: { size: 11 }, color: '#605E5C', maxRotation: 45 } },
-              yPct: { type: 'linear', position: 'left', grid: { color: '#EDEBE9' },
-                      ticks: { font: { size: 11 }, color: '#605E5C', callback: v => v + '%' },
-                      title: { display: true, text: '% of time / fuel', font: { size: 11 }, color: '#605E5C' } },
-              yL:   { type: 'linear', position: 'right', grid: { drawOnChartArea: false },
-                      ticks: { font: { size: 11 }, color: '#0078D4', callback: v => v + ' L' },
-                      title: { display: true, text: 'Litres wasted', font: { size: 11 }, color: '#0078D4' } }
-            }
-          }
-        }));
-
-        document.getElementById('vehicle-modal').style.display = 'flex';
-      };
-    });
-
-    document.getElementById('modal-close').onclick = () => {
-      document.getElementById('vehicle-modal').style.display = 'none';
-    };
-  }
-
-  // Tab switching
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  var currentCharts = [];
+  document.querySelectorAll('.detail-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      const id = btn.dataset.id;
+      const vehicle = vehicles.find(v => v.id === id);
+      if (!vehicle) return;
 
-      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-      document.getElementById(btn.dataset.tab).style.display = 'block';
+      document.getElementById('modal-vehicle-name').textContent = vehicle.name;
 
-      if (btn.dataset.tab === 'map') {
-        if (!map) initMap();
-        if (tripsData && tripsData.length > 0) updateMapMarkers(tripsData);
-      }
+      const days = Object.keys(dailyDataMap[id] || {}).sort();
+      const engineOnData = days.map(d => {
+        const dd = dailyDataMap[id][d];
+        return dd.idleSec / (dd.idleSec + dd.driveSec) * 100 || 0;
+      });
+      const idleFuelPctData = days.map(d => {
+        const dd = dailyDataMap[id][d];
+        return dd.totalFuelL > 0 ? dd.idleFuelL / dd.totalFuelL * 100 : 0;
+      });
+      const fuelWastedData = days.map(d => dailyDataMap[id][d].idleFuelL);
+
+      currentCharts.forEach(c => c.destroy());
+      currentCharts = [];
+
+      currentCharts.push(new Chart(document.getElementById('chart-engine-on'), {
+        type: 'line',
+        data: { labels: days, datasets: [{ label: '% Engine-on', data: engineOnData, borderColor: '#FFB900', tension: 0.3 }] },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      }));
+
+      currentCharts.push(new Chart(document.getElementById('chart-idle-fuel-pct'), {
+        type: 'line',
+        data: { labels: days, datasets: [{ label: 'Idle % of fuel', data: idleFuelPctData, borderColor: '#D13438', tension: 0.3 }] },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      }));
+
+      currentCharts.push(new Chart(document.getElementById('chart-fuel-wasted'), {
+        type: 'line',
+        data: { labels: days, datasets: [{ label: 'Fuel wasted (L)', data: fuelWastedData, borderColor: '#107C10', tension: 0.3 }] },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      }));
+
+      document.getElementById('vehicle-modal').style.display = 'flex';
     });
+  });
+
+  document.getElementById('modal-close').addEventListener('click', () => {
+    document.getElementById('vehicle-modal').style.display = 'none';
   });
 
   return {
@@ -842,7 +526,10 @@ geotab.addin["greenfleet-iq"] = () => {
       run(30);
       callback();
     },
-    focus: function (addinApi, state) { /* no-op — data loaded on initialize */ },
+    focus: function (addinApi, state) {
+      api = addinApi;
+      run(days);
+    },
     blur: () => {}
   };
 };

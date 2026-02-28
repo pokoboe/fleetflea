@@ -950,13 +950,6 @@ geotab.addin["greenfleet-iq"] = () => {
       if (btn.dataset.tab === 'map') {
         if (!map) initMap();
         if (tripsData && tripsData.length > 0) updateMapMarkers(tripsData);
-
-        // Resize карты после смены display (синхронизируем с кадром рендера)
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (map) map.invalidateSize();
-          }, 200);  // 200ms — достаточно для MyGeotab iframe
-        });
       }
     });
   });

@@ -124,6 +124,7 @@
   </style>
 </head>
 <body>
+
 <div class="addin-frame">
   <!-- Tab Navigation -->
   <div class="tab-bar">
@@ -950,6 +951,16 @@ geotab.addin["greenfleet-iq"] = () => {
       if (btn.dataset.tab === 'map') {
         if (!map) initMap();
         if (tripsData && tripsData.length > 0) updateMapMarkers(tripsData);
+
+        // Важно: invalidateSize после того, как flex и overflow применились
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (map) {
+              map.invalidateSize();
+              map.invalidateSize(); // двойной вызов — часто решает в iframe
+            }
+          }, 300);  // 300ms — надёжно для MyGeotab
+        });
       }
     });
   });

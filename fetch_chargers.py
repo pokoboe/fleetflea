@@ -16,12 +16,12 @@ KEY = "f15be0f9-2486-4438-8e59-2c460ae291ea"
 # Adjust these centers + radius to match where your fleet actually operates.
 # Each entry fetches up to 150 stations within `distance` miles.
 REGIONS = [
-    {"lat": 43.36,  "lng": -79.65,  "distance": 50, "label": "Toronto"},
-    {"lat": 41.85, "lng": -87.65,  "distance": 80,  "label": "Chicago"},
-    {"lat": 33.45, "lng": -112.07, "distance": 80,  "label": "Phoenix"},
-    {"lat": 29.76, "lng": -95.37,  "distance": 80,  "label": "Houston"},
-    {"lat": 39.73, "lng": -104.98, "distance": 80,  "label": "Denver"},
-    {"lat": 36.17, "lng": -86.78,  "distance": 80,  "label": "Nashville"},
+    {"lat": 43.45,  "lng": -79.65,  "distance": 20, "label": "Oakvile"},
+    {"lat": 43.52, "lng": -79.68,  "distance": 20,  "label": "Mississauga"},
+    {"lat": 43.65, "lng": -79.39, "distance": 20,  "label": "Toronto"},
+    {"lat": 43.70, "lng": -79.78,  "distance": 20,  "label": "Brampton"},
+    {"lat": 43.79, "lng": -79.54, "distance": 20,  "label": "Vaughan"},
+    {"lat": 43.50, "lng": -79.89,  "distance": 20,  "label": "Nashville"},
 ]
 
 all_stations = {}

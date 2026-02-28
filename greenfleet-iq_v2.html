@@ -944,20 +944,18 @@ geotab.addin["greenfleet-iq"] = () => {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
 
-      document.querySelectorAll('.tab-content').forEach(function(c) { c.style.display = 'none'; });
+      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
       const activeTab = document.getElementById(btn.dataset.tab);
-      activeTab.style.display = 'flex';
-      activeTab.style.flexDirection = 'column';
-      if (btn.dataset.tab === 'dashboard') { activeTab.style.overflowY = 'auto'; }
-      if (btn.dataset.tab === 'map') {
-        if (!map) { initMap(); if (tripsData) updateMapMarkers(tripsData); }
-        // Leaflet needs a moment after display:flex before invalidateSize
-        setTimeout(function() { if (map) map.invalidateSize(); }, 50);
-      }
+      activeTab.style.display = 'block';
 
       if (btn.dataset.tab === 'map') {
         if (!map) initMap();
         if (tripsData && tripsData.length > 0) updateMapMarkers(tripsData);
+
+        // Leaflet resize fix after tab becomes visible
+        setTimeout(() => {
+          if (map) map.invalidateSize();
+        }, 100);  // 100ms delay for DOM to settle
       }
     });
   });

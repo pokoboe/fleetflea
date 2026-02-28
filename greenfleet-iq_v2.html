@@ -257,11 +257,8 @@ function parseDur(d) {
 
 // Main logic
 
-const dailyDataMap = {};
 
 geotab.addin["greenfleet-iq"] = () => {
-  let api, tripsData = [], vehicles = [], days = 30;
-
   let api;
   let days = 30;
   let vehicles = [];
@@ -271,7 +268,7 @@ geotab.addin["greenfleet-iq"] = () => {
   let currentCharts = [];
   let map = null;
   let longStopLayer = null;
-  nightStopLayer = null;
+  let nightStopLayer = null;
   let evLayer = null;
 
   function run(selectedDays) {
@@ -515,7 +512,6 @@ geotab.addin["greenfleet-iq"] = () => {
 
 
   // ── Map ──────────────────────────────────────────────────────
-  let map = null, longStopLayer = null, nightStopLayer = null, evLayer = null;
 
   function initMap() {
     if (!window.L) return;

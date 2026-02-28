@@ -10,15 +10,15 @@
 </head>
 <body>
 
-  <!-- Tab Navigation -->
+  <!-- Tab bar -->
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="dashboard">📊 Idle & EV Analysis</button>
     <button class="tab-btn" data-tab="map">⚡ EV Charging Readiness</button>
   </div>
 
-  <!-- DASHBOARD TAB -->
-  <div id="dashboard" class="tab-content">
-    <!-- твой текущий код KPI + таблицы (я оставил полностью как в v1.7) -->
+  <!-- Dashboard tab -->
+  <div id="dashboard" class="tab-content" style="display:block">
+
     <div class="page-header">
       <div>
         <div class="page-title">🌿 GreenFleet IQ</div>
@@ -31,136 +31,138 @@
           <option value="30" selected>Last 30 days</option>
         </select>
         <span class="db-label" id="db-label">Loading...</span>
-        <span class="version-label">v1.8 · FleetFlea</span>
+        <span class="version-label">v1.9 · FleetFlea</span>
       </div>
     </div>
 
-  <div class="error-banner" id="error-banner" style="display:none"></div>
+    <div class="error-banner" id="error-banner" style="display:none"></div>
 
-  <div class="loading" id="loading">
-    <div class="spinner"></div>
-    <div id="loading-message">Fetching fleet data...</div>
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div id="loading-message">Fetching fleet data for last 30 days (trips + harsh events)...</div>
+    </div>
+
+    <div id="content" style="display:none">
+
+      <div class="kpi-row">
+        <div class="kpi-card green">
+          <div class="kpi-label">🌍 CO₂ emitted</div>
+          <div class="kpi-value" id="kpi-co2">—<span class="unit"> t</span></div>
+          <div class="kpi-desc">Tailpipe — engine data when available</div>
+          <div class="kpi-insight" id="kpi-co2-insight"></div>
+        </div>
+
+        <div class="kpi-card orange">
+          <div class="kpi-label">⏱️ Idle fuel wasted</div>
+          <div class="kpi-value" id="kpi-idle">—<span class="unit"> L</span></div>
+          <div class="kpi-desc">Engine running — vehicle stationary</div>
+          <div class="kpi-insight" id="kpi-idle-insight"></div>
+        </div>
+
+        <div class="kpi-card blue">
+          <div class="kpi-label">⚡ EV-ready vehicles</div>
+          <div class="kpi-value" id="kpi-ev">—<span class="unit"></span></div>
+          <div class="kpi-desc">Score ≥ 72 — good fit for current pattern</div>
+          <div class="kpi-insight" id="kpi-ev-insight"></div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">Top 10 Idle Offenders</span>
+          <span class="pill pill-orange" id="idle-fleet-pct"></span>
+        </div>
+        <div class="section-body">
+          <div class="insight-box" id="idle-highlight"></div>
+          <table>
+            <thead>
+              <tr>
+                <th>Vehicle</th>
+                <th>Idle time</th>
+                <th>% engine-on</th>
+                <th>Idle % of fuel</th>
+                <th>Fuel wasted</th>
+                <th>CO₂ wasted</th>
+                <th>Status</th>
+                <th>📊</th>
+              </tr>
+            </thead>
+            <tbody id="idle-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">Top EV Transition Candidates</span>
+          <span class="pill pill-blue" id="ev-saving-pill"></span>
+        </div>
+        <div class="section-body">
+          <div class="insight-box" id="ev-highlight"></div>
+          <table>
+            <thead>
+              <tr>
+                <th>Vehicle</th>
+                <th>Avg daily km</th>
+                <th>Trips / day</th>
+                <th>Idle %</th>
+                <th>Harsh penalty</th>
+                <th>EV Score</th>
+                <th>Recommendation</th>
+              </tr>
+            </thead>
+            <tbody id="ev-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="footer">
+        GreenFleet IQ v1.9 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
+      </div>
+
+    </div>
+
   </div>
 
-  <div id="content" style="display:none">
-
-    <div class="kpi-row">
-      <div class="kpi-card green">
-        <div class="kpi-label">🌍 CO₂ emitted</div>
-        <div class="kpi-value" id="kpi-co2">—<span class="unit"> t</span></div>
-        <div class="kpi-desc">Tailpipe — engine data when available</div>
-        <div class="kpi-insight" id="kpi-co2-insight"></div>
-      </div>
-
-      <div class="kpi-card orange">
-        <div class="kpi-label">⏱️ Idle fuel wasted</div>
-        <div class="kpi-value" id="kpi-idle">—<span class="unit"> L</span></div>
-        <div class="kpi-desc">Engine running — vehicle stationary</div>
-        <div class="kpi-insight" id="kpi-idle-insight"></div>
-      </div>
-
-      <div class="kpi-card blue">
-        <div class="kpi-label">⚡ EV-ready vehicles</div>
-        <div class="kpi-value" id="kpi-ev">—<span class="unit"></span></div>
-        <div class="kpi-desc">Score ≥ 72 — good fit for current pattern</div>
-        <div class="kpi-insight" id="kpi-ev-insight"></div>
+  <!-- Map tab -->
+  <div id="map" class="tab-content" style="display:none">
+    <div class="map-header">
+      <h2>EV Charging Readiness</h2>
+      <div class="map-filters">
+        <button class="pill pill-yellow active" id="filter-long">30–60 min stops</button>
+        <button class="pill pill-purple active" id="filter-night">Night stops</button>
+        <button class="pill pill-green active" id="filter-ev">EV Chargers</button>
       </div>
     </div>
-
-    <div class="section-card">
-      <div class="section-header">
-        <span class="section-title">Top 10 Idle Offenders</span>
-        <span class="pill pill-orange" id="idle-fleet-pct"></span>
-      </div>
-      <div class="section-body">
-        <div class="insight-box" id="idle-highlight"></div>
-        <table>
-          <thead>
-            <tr>
-              <th>Vehicle</th>
-              <th>Idle time</th>
-              <th>% engine-on</th>
-              <th>Idle % of fuel</th>
-              <th>Fuel wasted</th>
-              <th>CO₂ wasted</th>
-              <th>Status</th>
-              <th>📊</th>
-            </tr>
-          </thead>
-          <tbody id="idle-tbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="section-card">
-      <div class="section-header">
-        <span class="section-title">Top EV Transition Candidates</span>
-        <span class="pill pill-blue" id="ev-saving-pill"></span>
-      </div>
-      <div class="section-body">
-        <div class="insight-box" id="ev-highlight"></div>
-        <table>
-          <thead>
-            <tr>
-              <th>Vehicle</th>
-              <th>Avg daily km</th>
-              <th>Trips / day</th>
-              <th>Idle %</th>
-              <th>Harsh penalty</th>
-              <th>EV Score</th>
-              <th>Recommendation</th>
-            </tr>
-          </thead>
-          <tbody id="ev-tbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="footer">
-      GreenFleet IQ v1.8 • FleetFlea • Data: MyGeotab Trip API • Feb 2026
-    </div>
-
+    <div id="leaflet-map" style="height: calc(100vh - 100px);"></div>
   </div>
 
-  <!-- Modal -->
+  <!-- Modal for graphs -->
   <div id="vehicle-modal" class="modal" style="display:none">
     <div class="modal-content">
-      <button class="modal-close-btn" id="modal-close">×</button>
-      <div class="modal-vehicle-title" id="modal-vehicle-name"></div>
-      <div class="modal-subtitle">Daily idle breakdown — trends over selected period</div>
-      <div class="chart-wrap"><canvas id="chart-combined"></canvas></div>
+      <span class="close" id="modal-close">×</span>
+      <h2 id="modal-vehicle-name"></h2>
+      <canvas id="chart-engine-on" height="120"></canvas>
+      <canvas id="chart-idle-fuel-pct" height="120"></canvas>
+      <canvas id="chart-fuel-wasted" height="120"></canvas>
     </div>
-  </div>
-
-<!-- MAP TAB -->
-  <div id="map" class="tab-content" style="display:none; height: calc(100vh - 120px);">
-    <div class="map-header">
-      <h2>EV Charging Readiness Map</h2>
-      <div class="map-filters">
-        <button class="pill pill-yellow" id="filter-long">30–60 min stops</button>
-        <button class="pill pill-purple" id="filter-night">Night stops (>4h)</button>
-        <button class="pill pill-green" id="filter-ev">EV Chargers</button>
-        <button class="pill" id="filter-reset">Show All</button>
-      </div>
-    </div>
-    <div id="leaflet-map" style="height: 100%; width: 100%;"></div>
   </div>
 
 <script>
 (function() {
 "use strict";
 
-// ── Constants ─────────────────────────────────────────────────
+// Constants
 const CO2_KG_PER_L_GASOLINE = 2.32;
 const CO2_KG_PER_L_DIESEL   = 2.697;
 const FUEL_L_PER_100KM      = 10.0;
 const IDLE_L_PER_HOUR       = 0.80;
 const RESULTS_LIMIT         = 50000;
 
+const HARSH_THRESHOLD_PER_100KM = 4;
+const MAX_PENALTY_PCT           = 0.25;
 
-let currentCharts = [];
-
-// ── Helpers ───────────────────────────────────────────────────
+// Helpers
 const fmt = (n, dec = 0) => isNaN(n) || n == null ? "—" : Number(n).toLocaleString(undefined, {maximumFractionDigits: dec});
 
 function showError(msg) {
@@ -200,24 +202,23 @@ function progressBar(pct, color) {
   </div>`;
 }
 
-// ── Main logic ────────────────────────────────────────────────
-geotab.addin["greenfleet-iq"] = function () {
+// Main logic
+geotab.addin["greenfleet-iq"] = () => {
   let api;
   let days = 30;
-  let dailyDataMap = {};
   let vehicles = [];
+  let dailyDataMap = {};
 
-  function run(apiRef, selectedDays) {
-    api = apiRef;
+  function run(selectedDays) {
     days = selectedDays || days;
-    dailyDataMap = {};
     vehicles = [];
+    dailyDataMap = {};
 
     const now = new Date();
     const from = new Date(now - days * 86400000);
 
     document.getElementById("page-subtitle").textContent = `Fuel waste · Idle inefficiency · EV readiness · Last ${days} days`;
-    document.getElementById("loading-message").textContent = `Fetching fleet data for last ${days} days...`;
+    document.getElementById("loading-message").textContent = `Fetching fleet data for last ${days} days (trips + harsh events)...`;
     document.getElementById("content").style.display = "none";
     document.getElementById("loading").style.display = "flex";
 
@@ -231,22 +232,29 @@ geotab.addin["greenfleet-iq"] = function () {
         resultsLimit: RESULTS_LIMIT
       }, trips => {
 
-        // ExceptionEvent removed: rule is a reference object (id only),
-        // harsh penalty lookup needs a separate Rule fetch — not worth the latency.
-        render(trips, nameMap, devices);
+        api.call("Get", {
+          typeName: "ExceptionEvent",
+          search: { fromDate: from.toISOString(), toDate: now.toISOString() },
+          resultsLimit: 15000
+        }, exceptions => {
+          render(trips, exceptions, nameMap, devices);
+        }, err => {
+          console.warn("ExceptionEvent fetch failed — no harsh penalty", err);
+          render(trips, [], nameMap, devices);
+        });
 
-      }, err => showError("Trips failed: " + err));
+      }, err => showError("Trips: " + err));
 
-    }, err => showError("Devices failed: " + err));
+    }, err => showError("Devices: " + err));
   }
 
-  function render(trips, nameMap, devices) {
+  function render(trips, exceptions, nameMap, devices) {
     const deviceMap = {};
-    devices.forEach(d => deviceMap[d.id] = d);
+    devices.forEach(d => { deviceMap[d.id] = d; });
 
-    let maxRawDist = 0;
-    trips.forEach(t => { if ((t.distance||0) > maxRawDist) maxRawDist = t.distance||0; });
-    const kmFactor = maxRawDist > 5000 ? 0.001 : 1;
+    let maxDist = 0;
+    trips.forEach(t => { if ((t.distance||0) > maxDist) maxDist = t.distance; });
+    const kmFactor = maxDist > 5000 ? 0.001 : 1;
 
     const byVehicle = {};
 
@@ -261,12 +269,13 @@ geotab.addin["greenfleet-iq"] = function () {
           driveSec: 0, idleSec: 0,
           days: new Set(),
           fuelUsedL: 0,
+          harshCount: 0
         };
       }
       const v = byVehicle[id];
 
-      v.distKm   += (t.distance || 0) * kmFactor;
-      v.trips    += 1;
+      v.distKm += (t.distance || 0) * kmFactor;
+      v.trips += 1;
       v.days.add(t.start?.slice(0,10) || "");
 
       const parseDur = d => {
@@ -288,7 +297,7 @@ geotab.addin["greenfleet-iq"] = function () {
         v.fuelUsedL += Number(t.fuelUsed.value);
       }
 
-      // Daily aggregation
+      // Daily aggregation for graphs
       const day = t.start?.slice(0,10) || '';
       if (!dailyDataMap[id]) dailyDataMap[id] = {};
       if (!dailyDataMap[id][day]) dailyDataMap[id][day] = {idleSec:0, driveSec:0, idleFuelL:0, totalFuelL:0};
@@ -299,41 +308,62 @@ geotab.addin["greenfleet-iq"] = function () {
 
       let drivingFuelL = t.fuelUsed?.value && !isNaN(t.fuelUsed.value) ? Number(t.fuelUsed.value) : ((t.distance||0) * kmFactor * (FUEL_L_PER_100KM / 100));
       dd.idleFuelL += (parseDur(t.idlingDuration) / 3600) * IDLE_L_PER_HOUR;
-      dd.totalFuelL += drivingFuelL;
+      dd.totalFuelL += drivingFuelL + dd.idleFuelL;
+    });
+
+    const harshKeywords = ["HarshAcceleration", "HarshBrake", "HarshCornering"];
+    exceptions.forEach(e => {
+      const vid = e.device?.id;
+      if (!vid || !byVehicle[vid]) return;
+      const ruleName = (e.rule?.name || "").toLowerCase();
+      if (harshKeywords.some(kw => ruleName.includes(kw.toLowerCase()))) {
+        byVehicle[vid].harshCount++;
+      }
     });
 
     vehicles = Object.values(byVehicle).filter(v => v.trips > 0);
 
     vehicles.forEach(v => {
-      v.idleHrs    = v.idleSec / 3600;
-      v.driveHrs   = v.driveSec / 3600;
-      v.totalHrs   = v.idleHrs + v.driveHrs;
-      v.idlePct    = v.totalHrs > 0 ? v.idleSec / (v.driveSec + v.idleSec) * 100 : 0;
+      v.idleHrs = v.idleSec / 3600;
+      v.driveHrs = v.driveSec / 3600;
+      v.totalHrs = v.idleHrs + v.driveHrs;
+      v.idlePct = v.totalHrs > 0 ? v.idleSec / (v.driveSec + v.idleSec) * 100 : 0;
       v.activeDays = Math.max(v.days.size, 1);
       v.avgDailyKm = v.distKm / v.activeDays;
-      v.tripsDay   = v.trips / v.activeDays;
+      v.tripsDay = v.trips / v.activeDays;
 
-      let drivingFuelL = v.fuelUsedL > 0.1 ? v.fuelUsedL : v.distKm * (FUEL_L_PER_100KM / 100);
-      v.idleFuel   = v.idleHrs * IDLE_L_PER_HOUR;
-      v.totalFuel  = drivingFuelL + v.idleFuel;
+      let drivingFuelL;
+      if (v.fuelUsedL > 0.1) {
+        drivingFuelL = v.fuelUsedL;
+        v.fuelSource = "engine";
+      } else {
+        drivingFuelL = v.distKm * (FUEL_L_PER_100KM / 100);
+        v.fuelSource = "estimate";
+      }
 
-      v.harshPenaltyPct = 0;
+      v.idleFuel = v.idleHrs * IDLE_L_PER_HOUR;
+      v.baseFuel = drivingFuelL + v.idleFuel;
+
+      const harshPer100 = v.distKm > 0 ? (v.harshCount / v.distKm) * 100 : 0;
+      v.harshPenaltyPct = Math.min(MAX_PENALTY_PCT, Math.max(0, (harshPer100 - HARSH_THRESHOLD_PER_100KM) * 0.05)) * 100;
+      const penalizedDriving = drivingFuelL * (1 + v.harshPenaltyPct / 100);
+      v.totalFuel = penalizedDriving + v.idleFuel;
 
       const co2Factor = getEmissionFactor(deviceMap[v.id]);
-      v.co2Kg      = v.totalFuel * co2Factor;
-      v.co2IdleKg  = v.idleFuel * co2Factor;
+      v.co2Kg = v.totalFuel * co2Factor;
+      v.co2IdleKg = v.idleFuel * co2Factor;
 
       v.idleFuelPct = v.totalFuel > 0 ? v.idleFuel / v.totalFuel * 100 : 0;
 
-      v.evScore    = evScore(v.avgDailyKm, v.idlePct, v.tripsDay);
+      v.evScore = evScore(v.avgDailyKm, v.idlePct, v.tripsDay);
     });
 
-    const totalCO2     = vehicles.reduce((s,v)=>s+v.co2Kg,     0) / 1000;
-    const totalIdleL   = vehicles.reduce((s,v)=>s+v.idleFuel,  0);
-    const totalFuel    = vehicles.reduce((s,v)=>s+v.totalFuel, 0);
+    const totalCO2 = vehicles.reduce((s,v)=>s+v.co2Kg, 0) / 1000;
+    const totalIdleL = vehicles.reduce((s,v)=>s+v.idleFuel, 0);
+    const totalFuel = vehicles.reduce((s,v)=>s+v.totalFuel, 0);
     const fleetIdlePct = totalFuel > 0 ? totalIdleL / totalFuel * 100 : 0;
-    const evReady      = vehicles.filter(v => v.evScore >= 72);
-    const evCount      = evReady.length;
+    const evReady = vehicles.filter(v => v.evScore >= 72);
+    const evCount = evReady.length;
 
     document.getElementById("kpi-co2").innerHTML = fmt(totalCO2, totalCO2<10?1:0) + '<span class="unit"> t</span>';
     document.getElementById("kpi-co2-insight").innerHTML = `≈ <strong>${fmt(totalCO2 * 1000 / 0.115, 0)}</strong> km driven by avg passenger car`;
@@ -395,196 +425,49 @@ geotab.addin["greenfleet-iq"] = function () {
 
     document.getElementById("ev-saving-pill").textContent = `~${fmt(potYearCO2,0)} t CO₂/yr avoided if switched`;
 
-    // Графики в модалке
-    document.querySelectorAll('.detail-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.id;
-        const vehicle = vehicles.find(v => v.id === id);
-        if (!vehicle) return;
-
-        document.getElementById('modal-vehicle-name').textContent = vehicle.name;
-
-        const daysArr = Object.keys(dailyDataMap[id] || {}).sort();
-
-        const engineOnData = daysArr.map(d => {
-          const dd = dailyDataMap[id][d];
-          return dd.idleSec / (dd.idleSec + dd.driveSec) * 100 || 0;
-        });
-
-        const idleFuelPctData = daysArr.map(d => {
-          const dd = dailyDataMap[id][d];
-          return dd.totalFuelL > 0 ? dd.idleFuelL / dd.totalFuelL * 100 : 0;
-        });
-
-        const fuelWastedData = daysArr.map(d => dailyDataMap[id][d].idleFuelL);
-
-        currentCharts.forEach(c => c && c.destroy());
-        currentCharts = [];
-
-        currentCharts.push(new Chart(document.getElementById('chart-combined'), {
-          type: 'line',
-          data: {
-            labels: daysArr,
-            datasets: [
-              {
-                label: 'Idle % of engine-on time',
-                data: engineOnData,
-                borderColor: '#FFB900',
-                backgroundColor: 'rgba(255,185,0,.10)',
-                fill: true, tension: 0.35,
-                pointRadius: 3, pointHoverRadius: 5,
-                yAxisID: 'yPct'
-              },
-              {
-                label: 'Idle fuel % of total fuel',
-                data: idleFuelPctData,
-                borderColor: '#D13438',
-                backgroundColor: 'rgba(209,52,56,.07)',
-                fill: true, tension: 0.35,
-                pointRadius: 3, pointHoverRadius: 5,
-                yAxisID: 'yPct'
-              },
-              {
-                label: 'Idle fuel wasted (L)',
-                data: fuelWastedData,
-                borderColor: '#0078D4',
-                backgroundColor: 'rgba(0,120,212,.07)',
-                fill: false, tension: 0.35,
-                pointRadius: 3, pointHoverRadius: 5,
-                borderDash: [5, 3],
-                yAxisID: 'yL'
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-              legend: {
-                display: true,
-                position: 'bottom',
-                labels: {
-                  font: { family: "'Segoe UI', sans-serif", size: 12 },
-                  color: '#605E5C',
-                  padding: 20,
-                  usePointStyle: true,
-                  pointStyleWidth: 14
-                }
-              },
-              tooltip: {
-                backgroundColor: '#fff',
-                borderColor: '#C8C6C4',
-                borderWidth: 1,
-                titleColor: '#201F1E',
-                bodyColor: '#605E5C',
-                padding: 10,
-                callbacks: {
-                  label: ctx => {
-                    const v = ctx.parsed.y;
-                    if (ctx.datasetIndex < 2) return ` ${ctx.dataset.label}: ${v.toFixed(1)}%`;
-                    return ` ${ctx.dataset.label}: ${v.toFixed(1)} L`;
-                  }
-                }
-              }
-            },
-            scales: {
-              x: {
-                grid: { color: '#EDEBE9' },
-                ticks: { font: { size: 11 }, color: '#605E5C', maxRotation: 45 }
-              },
-              yPct: {
-                type: 'linear', position: 'left',
-                grid: { color: '#EDEBE9' },
-                ticks: { font: { size: 11 }, color: '#605E5C', callback: v => v + '%' },
-                title: { display: true, text: '% of time / fuel', font: { size: 11 }, color: '#605E5C' }
-              },
-              yL: {
-                type: 'linear', position: 'right',
-                grid: { drawOnChartArea: false },
-                ticks: { font: { size: 11 }, color: '#0078D4', callback: v => v + ' L' },
-                title: { display: true, text: 'Litres wasted', font: { size: 11 }, color: '#0078D4' }
-              }
-            }
-          }
-        }));
-
-        document.getElementById('vehicle-modal').style.display = 'flex';
-      });
-    });
-
-    document.getElementById('modal-close').addEventListener('click', () => {
-      document.getElementById('vehicle-modal').style.display = 'none';
-    });
+    // Update map if tab is open
+    if (document.getElementById('map').style.display === 'block') {
+      updateMapMarkers(trips);
+    }
 
     document.getElementById("loading").style.display = "none";
     document.getElementById("content").style.display = "block";
-
-    function updateMapMarkers(trips) {
-  longStopLayer.clearLayers();
-  nightStopLayer.clearLayers();
-
-  trips.forEach(t => {
-    if (!t.stopPoint) return;
-    const durMin = parseDur(t.stopDuration) / 60;
-
-    if (durMin >= 30 && durMin <= 60) {
-      L.marker([t.stopPoint.y, t.stopPoint.x], {icon: L.divIcon({className: 'stop-marker long', html: '🟡', iconSize: [24,24]})})
-        .bindPopup(`<b>30–60 min stop</b><br>${t.start.slice(0,16)}<br>Duration: ${durMin.toFixed(0)} min`)
-        .addTo(longStopLayer);
-    }
-
-    if (durMin > 240) { // >4 hours
-      const hour = parseInt(t.start.slice(11,13));
-      if (hour >= 22 || hour <= 6) {
-        L.marker([t.stopPoint.y, t.stopPoint.x], {icon: L.divIcon({className: 'stop-marker night', html: '🌙', iconSize: [24,24]})})
-          .bindPopup(`<b>Night stop</b><br>${t.start.slice(0,16)}<br>Duration: ${(durMin/60).toFixed(1)} h`)
-          .addTo(nightStopLayer);
-      }
-    }
-  });
-}
-updateMapMarkers(trips);
   }
 
-let map, longStopLayer, nightStopLayer, evLayer;
-let allStops = [];
+  let currentCharts = [];
+  document.querySelectorAll('.detail-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const vehicle = vehicles.find(v => v.id === id);
+      if (!vehicle) return;
 
-// Tab switching
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-    document.getElementById(btn.dataset.tab).style.display = 'block';
+      document.getElementById('modal-vehicle-name').textContent = vehicle.name;
 
-    if (btn.dataset.tab === 'map' && !map) initMap();
-  });
-});
-
-function initMap() {
-  map = L.map('leaflet-map').setView([25.76, -80.19], 10); // Miami center
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-
-  longStopLayer = L.layerGroup().addTo(map);
-  nightStopLayer = L.layerGroup().addTo(map);
-  evLayer = L.layerGroup().addTo(map);
-
-  // Fetch EV chargers from NREL (free API - replace DEMO_KEY after registration at developer.nrel.gov)
-  fetch('https://developer.nrel.gov/api/alt-fuel-stations/v1.json?api_key=DEMO_KEY&fuel_type=ELEC&state=FL&limit=200')
-    .then(r => r.json())
-    .then(data => {
-      data.fuel_stations.forEach(s => {
-        if (s.latitude && s.longitude) {
-          L.marker([s.latitude, s.longitude], {icon: L.divIcon({className: 'ev-marker', html: '⚡', iconSize: [30,30]})})
-            .bindPopup(`<b>${s.station_name}</b><br>${s.street_address}<br>${s.ev_dc_fast_num || 0} DC Fast | ${s.ev_level2_evse_num || 0} Level 2`)
-            .addTo(evLayer);
-        }
+      const days = Object.keys(dailyDataMap[id] || {}).sort();
+      const engineOnData = days.map(d => {
+        const dd = dailyDataMap[id][d];
+        return dd.idleSec / (dd.idleSec + dd.driveSec) * 100 || 0;
       });
+      const idleFuelPctData = days.map(d => {
+        const dd = dailyDataMap[id][d];
+        return dd.totalFuelL > 0 ? dd.idleFuelL / dd.totalFuelL * 100 : 0;
+      });
+      const fuelWastedData = days.map(d => dd.idleFuelL);
+
+      currentCharts.forEach(c => c.destroy());
+      currentCharts = [];
+
+      currentCharts.push(new Chart(document.getElementById('chart-engine-on'), { type: 'line', data: { labels: days, datasets: [{ label: '% Engine-on', data: engineOnData, borderColor: '#FFB900', tension: 0.3 }] }, options: { responsive: true, plugins: { legend: { display: false } } } }));
+      currentCharts.push(new Chart(document.getElementById('chart-idle-fuel-pct'), { type: 'line', data: { labels: days, datasets: [{ label: 'Idle % of fuel', data: idleFuelPctData, borderColor: '#D13438', tension: 0.3 }] }, options: { responsive: true, plugins: { legend: { display: false } } } }));
+      currentCharts.push(new Chart(document.getElementById('chart-fuel-wasted'), { type: 'line', data: { labels: days, datasets: [{ label: 'Fuel wasted (L)', data: fuelWastedData, borderColor: '#107C10', tension: 0.3 }] }, options: { responsive: true, plugins: { legend: { display: false } } } }));
+
+      document.getElementById('vehicle-modal').style.display = 'flex';
     });
+  });
+
+  document.getElementById('modal-close').addEventListener('click', () => {
+    document.getElementById('vehicle-modal').style.display = 'none';
+  });
 
   return {
     initialize: function (api, state, callback) {
@@ -600,7 +483,7 @@ function initMap() {
       run(api);
       callback();
     },
-    focus:   function (api, state) { /* no-op — data loaded on initialize */ },
+    focus:   function (api, state) { run(api, days); },
     blur:    () => {}
   };
 };

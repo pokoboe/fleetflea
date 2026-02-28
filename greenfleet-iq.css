@@ -24,6 +24,30 @@ body {
   padding: 24px;
 }
 
+/* ── Tab bar ── */
+.tab-bar {
+  display: flex;
+  background: var(--z-white);
+  border-bottom: 1px solid var(--z-neutral-300);
+  padding: 0 24px;
+}
+.tab-btn {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-weight: 600;
+  color: var(--z-neutral-600);
+  cursor: pointer;
+}
+.tab-btn.active {
+  border-bottom-color: var(--z-blue);
+  color: var(--z-neutral-900);
+}
+.tab-content {
+  padding: 16px 0;
+}
+
 /* ── Page header ── */
 .page-header {
   display: flex;
@@ -236,41 +260,14 @@ tr:hover td { background: #F3F2F1; }
 }
 .insight-box .icon { font-size: 16px; margin-top: 1px; flex-shrink: 0; }
 
-/* ── Responsive ── */
-@media (max-width: 768px) {
-  body { padding: 16px; }
-  .kpi-row { grid-template-columns: 1fr; }
-  th, td { padding-left: 16px; padding-right: 16px; }
-}
-
-#range-select {
-  font-size: 12px;
-  color: var(--z-neutral-600);
-  background: var(--z-white);
-  border: 1px solid var(--z-neutral-300);
-  border-radius: var(--z-radius);
-  padding: 4px 10px;
-  margin-right: 8px;
-  height: 28px;                /* чуть выше, как большинство элементов */
-  cursor: pointer;
-  appearance: none;             /* убираем дефолтную стрелку в некоторых браузерах */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23605E5C' d='M2 4l4 4 4-4z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  background-size: 12px;
-}
-
-/* hover и focus для интерактивности */
-#range-select:hover,
-#range-select:focus {
-  border-color: var(--z-blue);
-  outline: none;
-}
-
+/* ── Modal ── */
 .modal {
   position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0,0,0,0.7);
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -280,18 +277,37 @@ tr:hover td { background: #F3F2F1; }
   background: var(--z-white);
   padding: 24px;
   border-radius: var(--z-radius);
+  max-width: 800px;
   width: 90%;
-  max-width: 900px;
-  max-height: 90vh;
-  overflow-y: auto;
   position: relative;
 }
 .close {
   position: absolute;
-  top: 12px;
-  right: 16px;
-  font-size: 28px;
+  top: 10px;
+  right: 10px;
+  font-size: 24px;
   cursor: pointer;
-  color: var(--z-neutral-500);
+  color: var(--z-neutral-600);
 }
 .close:hover { color: var(--z-neutral-900); }
+
+/* ── Map ── */
+.map-header {
+  padding: 12px 24px;
+  background: var(--z-white);
+  border-bottom: 1px solid var(--z-neutral-300);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.map-filters .pill {
+  margin-left: 8px;
+}
+.map-filters .pill.active { border: 1px solid var(--z-blue); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  body { padding: 16px; }
+  .kpi-row { grid-template-columns: 1fr; }
+  th, td { padding-left: 16px; padding-right: 16px; }
+}

@@ -128,7 +128,7 @@
   <!-- Tab Navigation -->
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="dashboard">📊 Idle & EV Analysis</button>
-    <button class="tab-btn" data-tab="map">⚡ EV Charging Readiness</button>
+    <button class="tab-btn" data-tab="map">⚡ MAP EV Charging Readiness</button>
   </div>
 
   <!-- DASHBOARD TAB -->
@@ -141,11 +141,11 @@
       <div class="header-right">
         <select id="range-select">
           <option value="1">Last day</option>
-          <option value="5">Last 5 days</option>
+          <option value="7">Last 7 days</option>
           <option value="30" selected>Last 30 days</option>
         </select>
         <span class="db-label" id="db-label">Loading...</span>
-        <span class="version-label">v1.9 · FleetFlea</span>
+        <span class="version-label">v2.0 · FleetFlea</span>
       </div>
     </div>
 
@@ -198,7 +198,7 @@
                 <th title="Estimated litres burned while idling (0.8 L/hr rate)">Fuel wasted</th>
                 <th title="CO₂ from idle fuel only (2.32 kg/L gasoline, 2.7 diesel)">CO₂ wasted</th>
                 <th title="Critical >28% idle · High >16% · Normal ≤16%">Status</th>
-                <th title="Open daily trend chart for this vehicle">📊</th>
+                <th title="Open daily trend chart for this vehicle">View Details</th>
               </tr>
             </thead>
             <tbody id="idle-tbody"></tbody>

@@ -948,7 +948,12 @@ geotab.addin["greenfleet-iq"] = () => {
       const activeTab = document.getElementById(btn.dataset.tab);
       activeTab.style.display = 'flex';
       activeTab.style.flexDirection = 'column';
-      if (btn.dataset.tab === 'dashboard') activeTab.style.overflowY = 'auto';
+      if (btn.dataset.tab === 'dashboard') { activeTab.style.overflowY = 'auto'; }
+      if (btn.dataset.tab === 'map') {
+        if (!map) { initMap(); if (tripsData) updateMapMarkers(tripsData); }
+        // Leaflet needs a moment after display:flex before invalidateSize
+        setTimeout(function() { if (map) map.invalidateSize(); }, 50);
+      }
 
       if (btn.dataset.tab === 'map') {
         if (!map) initMap();

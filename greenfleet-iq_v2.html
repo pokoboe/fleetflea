@@ -945,17 +945,18 @@ geotab.addin["greenfleet-iq"] = () => {
       btn.classList.add('active');
 
       document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-      const activeTab = document.getElementById(btn.dataset.tab);
-      activeTab.style.display = 'block';
+      document.getElementById(btn.dataset.tab).style.display = 'block';
 
       if (btn.dataset.tab === 'map') {
         if (!map) initMap();
         if (tripsData && tripsData.length > 0) updateMapMarkers(tripsData);
 
-        // Leaflet resize fix after tab becomes visible
-        setTimeout(() => {
-          if (map) map.invalidateSize();
-        }, 100);  // 100ms delay for DOM to settle
+        // Resize карты после смены display (синхронизируем с кадром рендера)
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (map) map.invalidateSize();
+          }, 200);  // 200ms — достаточно для MyGeotab iframe
+        });
       }
     });
   });

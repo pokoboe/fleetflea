@@ -16,10 +16,11 @@
   </div>
 
   <div id="dashboard" class="tab-content" style="display:block">
+
     <div class="page-header">
       <div>
         <div class="page-title">🌿 GreenFleet IQ</div>
-        <div class="page-subtitle" id="page-subtitle">Last 30 days</div>
+        <div class="page-subtitle" id="page-subtitle">Fuel waste · Idle inefficiency · EV readiness · Last 30 days</div>
       </div>
       <div class="header-right">
         <select id="range-select">
@@ -36,10 +37,11 @@
 
     <div class="loading" id="loading">
       <div class="spinner"></div>
-      <div id="loading-message">Loading fleet data...</div>
+      <div id="loading-message">Fetching fleet data for last 30 days (trips + harsh events)...</div>
     </div>
 
     <div id="content" style="display:none">
+
       <div class="kpi-row">
         <div class="kpi-card green">
           <div class="kpi-label">🌍 CO₂ emitted</div>
@@ -115,15 +117,23 @@
       <div class="footer">
         GreenFleet IQ v1.9 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
       </div>
+
     </div>
+
   </div>
 
-  <!-- Map tab -->
   <div id="map" class="tab-content" style="display:none">
-    <div id="leaflet-map" style="height: calc(100vh - 60px);"></div>
+    <div class="map-header">
+      <h2>EV Charging Readiness</h2>
+      <div class="map-filters">
+        <button class="pill pill-yellow active" id="filter-long">30–60 min stops</button>
+        <button class="pill pill-purple active" id="filter-night">Night stops</button>
+        <button class="pill pill-green active" id="filter-ev">EV Chargers</button>
+      </div>
+    </div>
+    <div id="leaflet-map" style="height: calc(100vh - 100px);"></div>
   </div>
 
-  <!-- Modal for graphs -->
   <div id="vehicle-modal" class="modal" style="display:none">
     <div class="modal-content">
       <span class="close" id="modal-close">×</span>
@@ -138,7 +148,7 @@
 (function() {
 "use strict";
 
-// Constants & Helpers (все как было)
+// Constants
 const CO2_KG_PER_L_GASOLINE = 2.32;
 const CO2_KG_PER_L_DIESEL   = 2.697;
 const FUEL_L_PER_100KM      = 10.0;
@@ -148,6 +158,7 @@ const RESULTS_LIMIT         = 50000;
 const HARSH_THRESHOLD_PER_100KM = 4;
 const MAX_PENALTY_PCT           = 0.25;
 
+// Helpers
 const fmt = (n, dec = 0) => isNaN(n) || n == null ? "—" : Number(n).toLocaleString(undefined, {maximumFractionDigits: dec});
 
 function showError(msg) {
@@ -187,17 +198,14 @@ function progressBar(pct, color) {
   </div>`;
 }
 
-Main add-in
+// Main logic
 geotab.addin["greenfleet-iq"] = () => {
   let api;
   let days = 30;
   let vehicles = [];
   let dailyDataMap = {};
   let currentCharts = [];
-  let map = null;
-  let longStopLayer = null;
-  let nightStopLayer = null;
-  let evLayer = null;
+  let map, longStopLayer, nightStopLayer, evLayer;
 
   function run(selectedDays) {
     days = selectedDays || days;
@@ -233,14 +241,14 @@ geotab.addin["greenfleet-iq"] = () => {
           render(trips, [], nameMap, devices);
         });
 
-      }, err => showError("Trips: " + err));
+      }, err => showError("Trips fetch failed: " + err));
 
-    }, err => showError("Devices: " + err));
+    }, err => showError("Devices fetch failed: " + err));
   }
 
   function render(trips, exceptions, nameMap, devices) {
     const deviceMap = {};
-    devices.forEach(d => deviceMap[d.id] = d);
+    devices.forEach(d => { deviceMap[d.id] = d; });
 
     let maxDist = 0;
     trips.forEach(t => { if ((t.distance||0) > maxDist) maxDist = t.distance; });
@@ -287,7 +295,7 @@ geotab.addin["greenfleet-iq"] = () => {
         v.fuelUsedL += Number(t.fuelUsed.value);
       }
 
-      // Daily aggregation
+      // Daily aggregation for graphs
       const day = t.start?.slice(0,10) || '';
       if (!dailyDataMap[id]) dailyDataMap[id] = {};
       if (!dailyDataMap[id][day]) dailyDataMap[id][day] = {idleSec:0, driveSec:0, idleFuelL:0, totalFuelL:0};
@@ -348,7 +356,6 @@ geotab.addin["greenfleet-iq"] = () => {
       v.evScore = evScore(v.avgDailyKm, v.idlePct, v.tripsDay);
     });
 
-    // KPI
     const totalCO2 = vehicles.reduce((s,v)=>s+v.co2Kg, 0) / 1000;
     const totalIdleL = vehicles.reduce((s,v)=>s+v.idleFuel, 0);
     const totalFuel = vehicles.reduce((s,v)=>s+v.totalFuel, 0);
@@ -415,16 +422,11 @@ geotab.addin["greenfleet-iq"] = () => {
 
     document.getElementById("ev-saving-pill").textContent = `~${fmt(potYearCO2,0)} t CO₂/yr avoided if switched`;
 
-    // Update map markers if map tab is open
-    if (document.getElementById('map').style.display === 'block') {
-      updateMapMarkers(trips);
-    }
-
     document.getElementById("loading").style.display = "none";
     document.getElementById("content").style.display = "block";
   }
 
-  // Modal graphs
+  let currentCharts = [];
   document.querySelectorAll('.detail-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.id;
@@ -472,96 +474,27 @@ geotab.addin["greenfleet-iq"] = () => {
   document.getElementById('modal-close').addEventListener('click', () => {
     document.getElementById('vehicle-modal').style.display = 'none';
   });
-function initMap() {
-  if (map) return;  // уже создана — выходим
-
-  map = L.map('leaflet-map').setView([25.7617, -80.1918], 11); // центр Майами
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(map);
-
-  longStopLayer = L.layerGroup().addTo(map);
-  nightStopLayer = L.layerGroup().addTo(map);
-  evLayer = L.layerGroup().addTo(map);
-
-  // Загрузка EV-зарядок (замени DEMO_KEY на свой реальный ключ с developer.nrel.gov)
-  fetch('https://developer.nrel.gov/api/alt-fuel-stations/v1.json?api_key=DEMO_KEY&fuel_type=ELEC&state=FL&limit=200')
-    .then(r => r.json())
-    .then(data => {
-      data.fuel_stations.forEach(s => {
-        if (s.latitude && s.longitude) {
-          L.marker([s.latitude, s.longitude])
-            .setIcon(L.divIcon({className: 'ev-marker', html: '⚡', iconSize: [30,30]}))
-            .bindPopup(`<b>${s.station_name || 'EV Station'}</b><br>${s.street_address || 'No address'}<br>DC Fast: ${s.ev_dc_fast_num || 0} | Level 2: ${s.ev_level2_evse_num || 0}`)
-            .addTo(evLayer);
-        }
-      });
-    })
-    .catch(err => console.warn("NREL API error:", err));
-}
-
-// Обновление маркеров остановок
-function updateMapMarkers(trips) {
-  longStopLayer.clearLayers();
-  nightStopLayer.clearLayers();
-
-  trips.forEach(t => {
-    if (!t.stopPoint || !t.stopPoint.y || !t.stopPoint.x) return;
-
-    const durSec = parseDur(t.stopDuration);
-    const durMin = durSec / 60;
-
-    // 30–60 минут
-    if (durMin >= 30 && durMin <= 60) {
-      L.marker([t.stopPoint.y, t.stopPoint.x])
-        .setIcon(L.divIcon({className: 'stop-marker long', html: '🟡', iconSize: [24,24]}))
-        .bindPopup(`<b>30–60 min stop</b><br>${t.start.slice(0,16)}<br>Duration: ${durMin.toFixed(0)} min`)
-        .addTo(longStopLayer);
-    }
-
-    // Ночные стоянки (>4 часа + 22:00–06:00)
-    if (durMin > 240) {
-      const startHour = parseInt(t.start.slice(11,13));
-      if (startHour >= 22 || startHour <= 6) {
-        L.marker([t.stopPoint.y, t.stopPoint.x])
-          .setIcon(L.divIcon({className: 'stop-marker night', html: '🌙', iconSize: [24,24]}))
-          .bindPopup(`<b>Night stop</b><br>${t.start.slice(0,16)}<br>Duration: ${(durMin/60).toFixed(1)} h`)
-          .addTo(nightStopLayer);
-      }
-    }
-  });
-
-  // Авто-зум по всем маркерам (опционально)
-  const group = L.featureGroup([...longStopLayer.getLayers(), ...nightStopLayer.getLayers()]);
-  if (group.getLayers().length > 0) {
-    map.fitBounds(group.getBounds(), { padding: [50, 50] });
-  }
-}
-
-// Tab switching
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-
-    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-    document.getElementById(btn.dataset.tab).style.display = 'block';
-
-    if (btn.dataset.tab === 'map') {
-      if (!map) initMap();
-      updateMapMarkers([]); // обновить, если данные уже загружены
-    }
-  });
-});
 
   return {
     initialize: function (addinApi, state, callback) {
       api = addinApi;
-      run();
+
+      api.getSession(s => {
+        document.getElementById("db-label").textContent = s.database || "—";
+      });
+
+      document.getElementById("range-select").addEventListener("change", function (e) {
+        const selectedDays = parseInt(e.target.value);
+        run(selectedDays);
+      });
+
+      run(30);
       callback();
     },
-    focus: run,
+    focus: function (addinApi, state) {
+      api = addinApi;
+      run(days);
+    },
     blur: () => {}
   };
 };

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>GreenFleet IQ • FleetFlea</title>
   <link rel="stylesheet" href="greenfleet-iq.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="lib/chart.umd.min.js"></script>
   <link rel="stylesheet" href="lib/leaflet.css" />
   <script src="lib/leaflet.js"></script>
   <style>
@@ -660,36 +660,60 @@ geotab.addin["greenfleet-iq"] = () => {
   }
 
   function loadEVChargers(lat, lng) {
-    // OpenChargeMap — free, no API key for basic use
-    const url = 'https://api.openchargemap.io/v3/poi/?output=json' +
-      '&latitude=' + lat + '&longitude=' + lng +
-      '&distance=50&distanceunit=Miles&maxresults=40&compact=true&verbose=false';
+    // OpenChargeMap — JSONP to bypass CSP/iframe fetch restrictions
+    const cbName = 'ocmCallback_' + Date.now();
+    const script = document.createElement('script');
 
-    fetch(url)
-      .then(r => r.json())
-      .then(data => {
-        evLayer.clearLayers();
-        (data || []).forEach(station => {
-          const sLat = station.AddressInfo?.Latitude;
-          const sLng = station.AddressInfo?.Longitude;
-          if (!sLat || !sLng) return;
-          const name    = station.AddressInfo?.Title || 'EV Charger';
-          const address = station.AddressInfo?.AddressLine1 || '';
-          const connectors = station.NumberOfPoints || '?';
-          const power   = station.Connections?.[0]?.PowerKW;
-          const popup = `<strong>⚡ ${name}</strong><br>${address}<br>` +
-                        `${connectors} connector${connectors !== 1 ? 's' : ''}` +
-                        (power ? ` · ${power} kW` : '');
-          L.circleMarker([sLat, sLng], {
-            radius: 7, color: '#107C10', fillColor: '#107C10',
-            fillOpacity: 0.8, weight: 2
-          }).bindPopup(popup).addTo(evLayer);
-        });
-      })
-      .catch(() => {
-        // OpenChargeMap unreachable — show note
-        showMapBanner('⚡ EV charger data unavailable (network)');
+    window[cbName] = function(data) {
+      // cleanup
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+
+      evLayer.clearLayers();
+      if (!data || !data.length) {
+        showMapBanner('⚡ No EV chargers found in this area');
+        return;
+      }
+      data.forEach(station => {
+        const sLat = station.AddressInfo && station.AddressInfo.Latitude;
+        const sLng = station.AddressInfo && station.AddressInfo.Longitude;
+        if (!sLat || !sLng) return;
+        const name    = (station.AddressInfo && station.AddressInfo.Title) || 'EV Charger';
+        const address = (station.AddressInfo && station.AddressInfo.AddressLine1) || '';
+        const connectors = station.NumberOfPoints || '?';
+        const conn0   = station.Connections && station.Connections[0];
+        const power   = conn0 && conn0.PowerKW;
+        const popup   = '<strong>⚡ ' + name + '</strong><br>' +
+                        (address ? address + '<br>' : '') +
+                        connectors + ' connector' + (connectors !== 1 ? 's' : '') +
+                        (power ? ' · ' + power + ' kW' : '');
+        L.circleMarker([sLat, sLng], {
+          radius: 7, color: '#107C10', fillColor: '#107C10',
+          fillOpacity: 0.82, weight: 2
+        }).bindPopup(popup).addTo(evLayer);
       });
+    };
+
+    script.onerror = function() {
+      delete window[cbName];
+      showMapBanner('⚡ EV charger data unavailable (network blocked)');
+    };
+
+    // 60s timeout fallback
+    const timer = setTimeout(function() {
+      if (window[cbName]) {
+        delete window[cbName];
+        showMapBanner('⚡ EV charger request timed out');
+      }
+    }, 60000);
+
+    script.src = 'https://api.openchargemap.io/v3/poi/?output=json' +
+      '&callback=' + cbName +
+      '&latitude=' + lat + '&longitude=' + lng +
+      '&distance=50&distanceunit=Miles' +
+      '&maxresults=40&compact=true&verbose=false';
+
+    document.head.appendChild(script);
   }
 
 

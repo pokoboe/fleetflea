@@ -513,161 +513,185 @@ geotab.addin["greenfleet-iq"] = () => {
     nightStopLayer.clearLayers();
     evLayer.clearLayers();
 
-    // Remove old banner if present
     const oldBanner = document.getElementById('map-banner');
     if (oldBanner) oldBanner.remove();
 
-    const mapDiv = document.getElementById('leaflet-map');
-    mapDiv.insertAdjacentHTML('afterbegin',
-      '<div id="map-banner" style="position:absolute;top:12px;left:50%;transform:translateX(-50%);' +
-      'z-index:999;background:#fff;border:1px solid #C8C6C4;border-radius:4px;' +
-      'padding:8px 16px;font-size:13px;color:#605E5C">⏳ Loading stop coordinates...</div>');
+    showMapBanner('⏳ Loading stop locations via LogRecord...');
 
-    // Step 1: current positions via DeviceStatusInfo (fast, no date filter needed)
-    api.call("Get", { typeName: "DeviceStatusInfo" }, function(statuses) {
-      const posMap = {};
-      statuses.forEach(s => {
-        if (s.latitude && s.longitude && Math.abs(s.latitude) > 0.01) {
-          posMap[s.device.id] = { lat: s.latitude, lng: s.longitude };
+    // ── Build stop candidates from trip gaps ─────────────────
+    // gapMin 25–480 = plausible stop (not noise, not overnight multi-day)
+    const byVeh = {};
+    trips.forEach(t => {
+      const id = t.device?.id;
+      if (!id) return;
+      if (!byVeh[id]) byVeh[id] = [];
+      byVeh[id].push(t);
+    });
+
+    // Two categories:
+    // CHARGING stops: 30–90 min (long enough to charge, short enough to be intentional)
+    // NIGHT stops: gap spans midnight AND > 5 hours (parked overnight = home charging opportunity)
+    const chargingCandidates = [];
+    const nightCandidates    = [];
+
+    Object.entries(byVeh).forEach(([id, vTrips]) => {
+      vTrips.sort((a, b) => new Date(a.stop || a.start) - new Date(b.stop || b.start));
+      for (let i = 0; i < vTrips.length - 1; i++) {
+        const t1 = vTrips[i], t2 = vTrips[i + 1];
+        if (!t1.stop || !t2.start) continue;
+        const stopDt  = new Date(t1.stop);
+        const startDt = new Date(t2.start);
+        const gapMin  = (startDt - stopDt) / 60000;
+        if (gapMin < 25) continue;
+
+        const vehName = vehicles.find(v => v.id === id)?.name || id;
+
+        const isNight = (() => {
+          // Spans midnight: stop before 23:00, resume after 05:00, gap > 5h
+          if (gapMin < 300) return false;
+          const stopH  = stopDt.getHours();
+          const startH = startDt.getHours();
+          return stopH >= 16 && startH <= 9; // parked evening, left morning
+        })();
+
+        if (isNight) {
+          nightCandidates.push({ deviceId: id, vehName, stopTime: t1.stop, gapMin });
+        } else if (gapMin >= 30 && gapMin <= 90) {
+          chargingCandidates.push({ deviceId: id, vehName, stopTime: t1.stop, gapMin });
         }
-      });
+      }
+    });
 
-      // Step 2: build stop candidates from trip gaps
-      const byVeh = {};
-      trips.forEach(t => {
-        const id = t.device?.id;
-        if (!id) return;
-        if (!byVeh[id]) byVeh[id] = [];
-        byVeh[id].push(t);
-      });
+    // Sample top 60 charging + top 40 night stops for LogRecord
+    chargingCandidates.sort((a, b) => b.gapMin - a.gapMin);
+    nightCandidates.sort((a, b) => b.gapMin - a.gapMin);
+    const sample = [
+      ...chargingCandidates.slice(0, 60).map(s => ({ ...s, type: 'charging' })),
+      ...nightCandidates.slice(0, 40).map(s => ({ ...s, type: 'night' }))
+    ];
 
-      // Collect stops that need LogRecord lookup
-      const stopCandidates = []; // { deviceId, stopTime, gapMin, nameStr }
-      Object.entries(byVeh).forEach(([id, vTrips]) => {
-        vTrips.sort((a,b) => new Date(a.stop||a.start) - new Date(b.stop||b.start));
-        for (let i = 0; i < vTrips.length - 1; i++) {
-          const t1 = vTrips[i], t2 = vTrips[i+1];
-          if (!t1.stop || !t2.start) continue;
-          const gapMin = (new Date(t2.start) - new Date(t1.stop)) / 60000;
-          if (gapMin < 25 || gapMin > 480) continue; // only 25min–8hr gaps
-          stopCandidates.push({
-            deviceId: id,
-            deviceName: t1.device?.id ? (vehicles.find(v=>v.id===id)?.name || id) : id,
-            stopTime:  t1.stop,
-            startTime: t2.start,
-            gapMin
-          });
+    if (sample.length === 0) {
+      showMapBanner('💡 No qualifying stops in this period — try a longer date range');
+      return;
+    }
+
+    // ── LogRecord lookup per stop ────────────────────────────
+    let done = 0;
+    const allCoords = []; // for fitBounds
+
+    sample.forEach(stop => {
+      const fromDt = new Date(new Date(stop.stopTime).getTime() - 4 * 60000).toISOString();
+      api.call("Get", {
+        typeName: "LogRecord",
+        search: {
+          deviceSearch: { id: stop.deviceId },
+          fromDate: fromDt,
+          toDate:   stop.stopTime
+        },
+        resultsLimit: 5
+      }, function(logs) {
+        if (logs && logs.length > 0) {
+          const log = logs[logs.length - 1];
+          const lat = log.latitude, lng = log.longitude;
+          if (Math.abs(lat) > 0.01 && Math.abs(lng) > 0.01) {
+            allCoords.push([lat, lng]);
+            const timeStr = new Date(stop.stopTime).toLocaleString(undefined,
+              { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const popup = `<strong>${stop.vehName}</strong><br>` +
+                          `${stop.type === 'night' ? '🌙 Night stop' : '⏱ Charging stop'}: ` +
+                          `<strong>${Math.round(stop.gapMin)} min</strong><br>` +
+                          `${timeStr}`;
+
+            if (stop.type === 'charging') {
+              L.circleMarker([lat, lng], {
+                radius: 8, color: '#FFB900', fillColor: '#FFB900',
+                fillOpacity: 0.82, weight: 2
+              }).bindPopup(popup).addTo(longStopLayer);
+            } else {
+              L.circleMarker([lat, lng], {
+                radius: 8, color: '#8764B8', fillColor: '#8764B8',
+                fillOpacity: 0.82, weight: 2
+              }).bindPopup(popup).addTo(nightStopLayer);
+            }
+          }
         }
+        done++;
+        if (done === sample.length) onAllDone();
+      }, function() {
+        done++;
+        if (done === sample.length) onAllDone();
       });
+    });
 
-      // Step 3: sample up to 80 stops for LogRecord lookup (avoid rate limits)
-      // Pick most interesting stops: longest gaps first
-      stopCandidates.sort((a,b) => b.gapMin - a.gapMin);
-      const sample = stopCandidates.slice(0, 80);
+    // ── After LogRecord done: load EV chargers ───────────────
+    function onAllDone() {
+      const banner = document.getElementById('map-banner');
+      const chargingCount = longStopLayer.getLayers().length;
+      const nightCount    = nightStopLayer.getLayers().length;
 
-      if (sample.length === 0) {
-        // Fall back to just showing current positions
-        Object.entries(posMap).forEach(([id, pos]) => {
-          const veh = vehicles.find(v => v.id === id);
-          const score = veh?.evScore || 0;
-          const color = score >= 72 ? '#107C10' : score >= 55 ? '#0078D4' : '#605E5C';
-          L.circleMarker([pos.lat, pos.lng], { radius: 8, color, fillOpacity: 0.8, weight: 2 })
-           .bindPopup(`<strong>${veh?.name || id}</strong><br>EV Score: ${score}`)
-           .addTo(evLayer);
-        });
-        document.getElementById('map-banner').remove();
-        return;
+      if (chargingCount === 0 && nightCount === 0) {
+        showMapBanner('💡 No stop coordinates in LogRecord — GPS data may be sparse');
+      } else {
+        if (banner) banner.remove();
       }
 
-      // Batch LogRecord calls — one per stop candidate
-      let done = 0;
-      const total = sample.length;
-      let placed = 0;
+      // Auto-fit to stops
+      if (allCoords.length > 1) {
+        map.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50] });
+      }
 
-      sample.forEach(stop => {
-        // Get last GPS point just before trip ended
-        const fromDt = new Date(new Date(stop.stopTime).getTime() - 3 * 60000).toISOString();
-        const toDt   = stop.stopTime;
-
-        api.call("Get", {
-          typeName: "LogRecord",
-          search: {
-            deviceSearch: { id: stop.deviceId },
-            fromDate: fromDt,
-            toDate:   toDt
-          },
-          resultsLimit: 5
-        }, function(logs) {
-          done++;
-          if (logs && logs.length > 0) {
-            // Last log = position when trip ended = stop location
-            const log = logs[logs.length - 1];
-            const lat = log.latitude, lng = log.longitude;
-            if (Math.abs(lat) > 0.01 && Math.abs(lng) > 0.01) {
-              placed++;
-              const stopHour = new Date(stop.stopTime).getHours();
-              const isNight  = stopHour >= 21 || stopHour < 6;
-              const popup    = `<strong>${stop.deviceName}</strong><br>` +
-                               `Stop: ${Math.round(stop.gapMin)} min<br>` +
-                               `${new Date(stop.stopTime).toLocaleString()}`;
-
-              if (stop.gapMin >= 30 && stop.gapMin <= 60) {
-                L.circleMarker([lat, lng], {
-                  radius: 7, color: '#FFB900', fillColor: '#FFB900',
-                  fillOpacity: 0.75, weight: 2
-                }).bindPopup(popup).addTo(longStopLayer);
-              }
-              if (isNight) {
-                L.circleMarker([lat, lng], {
-                  radius: 7, color: '#8764B8', fillColor: '#8764B8',
-                  fillOpacity: 0.75, weight: 2
-                }).bindPopup(popup).addTo(nightStopLayer);
-              }
-            }
-          }
-
-          if (done === total) {
-            // Done — add current EV candidate positions
-            vehicles.filter(v => v.evScore >= 55).forEach(veh => {
-              const pos = posMap[veh.id];
-              if (!pos) return;
-              const color = veh.evScore >= 72 ? '#107C10' : '#0078D4';
-              L.circleMarker([pos.lat, pos.lng], {
-                radius: 9, color, fillColor: color, fillOpacity: 0.85, weight: 2
-              }).bindPopup(
-                `<strong>${veh.name}</strong><br>⚡ EV Score: <strong>${veh.evScore}</strong><br>` +
-                `Avg ${Math.round(veh.avgDailyKm)} km/day · Idle ${veh.idlePct.toFixed(1)}%`
-              ).addTo(evLayer);
-            });
-
-            const banner = document.getElementById('map-banner');
-            if (banner) {
-              if (placed > 0) {
-                banner.remove();
-              } else {
-                banner.textContent = '💡 No stop coordinates found in LogRecord for this period';
-              }
-            }
-
-            // Auto-fit map to markers
-            const allLayers = [longStopLayer, nightStopLayer, evLayer];
-            const bounds = [];
-            allLayers.forEach(layer => {
-              layer.eachLayer(m => {
-                const ll = m.getLatLng();
-                if (ll) bounds.push(ll);
-              });
-            });
-            if (bounds.length > 1) map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40] });
-          }
-        }, function() { done++; }); // on error — just count as done
-      });
-
-    }, function(err) {
-      console.warn("DeviceStatusInfo failed:", err);
-      document.getElementById('map-banner').textContent = '⚠️ Could not load vehicle positions';
-    });
+      // Load EV chargers around fleet stops centroid
+      if (allCoords.length === 0) return;
+      const centerLat = allCoords.reduce((s, c) => s + c[0], 0) / allCoords.length;
+      const centerLng = allCoords.reduce((s, c) => s + c[1], 0) / allCoords.length;
+      loadEVChargers(centerLat, centerLng);
+    }
   }
+
+  function showMapBanner(msg) {
+    const oldBanner = document.getElementById('map-banner');
+    if (oldBanner) oldBanner.remove();
+    document.getElementById('leaflet-map').insertAdjacentHTML('afterbegin',
+      '<div id="map-banner" style="position:absolute;top:12px;left:50%;' +
+      'transform:translateX(-50%);z-index:999;background:#fff;' +
+      'border:1px solid #C8C6C4;border-radius:4px;' +
+      'padding:8px 16px;font-size:13px;color:#605E5C;white-space:nowrap">' +
+      msg + '</div>');
+  }
+
+  function loadEVChargers(lat, lng) {
+    // OpenChargeMap — free, no API key for basic use
+    const url = 'https://api.openchargemap.io/v3/poi/?output=json' +
+      '&latitude=' + lat + '&longitude=' + lng +
+      '&distance=50&distanceunit=Miles&maxresults=40&compact=true&verbose=false';
+
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        evLayer.clearLayers();
+        (data || []).forEach(station => {
+          const sLat = station.AddressInfo?.Latitude;
+          const sLng = station.AddressInfo?.Longitude;
+          if (!sLat || !sLng) return;
+          const name    = station.AddressInfo?.Title || 'EV Charger';
+          const address = station.AddressInfo?.AddressLine1 || '';
+          const connectors = station.NumberOfPoints || '?';
+          const power   = station.Connections?.[0]?.PowerKW;
+          const popup = `<strong>⚡ ${name}</strong><br>${address}<br>` +
+                        `${connectors} connector${connectors !== 1 ? 's' : ''}` +
+                        (power ? ` · ${power} kW` : '');
+          L.circleMarker([sLat, sLng], {
+            radius: 7, color: '#107C10', fillColor: '#107C10',
+            fillOpacity: 0.8, weight: 2
+          }).bindPopup(popup).addTo(evLayer);
+        });
+      })
+      .catch(() => {
+        // OpenChargeMap unreachable — show note
+        showMapBanner('⚡ EV charger data unavailable (network)');
+      });
+  }
+
 
   // ── Detail button (chart modal) ─────────────────────────────
   function bindDetailButtons() {

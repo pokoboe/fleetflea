@@ -139,7 +139,7 @@
                 <th>Harsh penalty</th>
                 <th>EV Score</th>
                 <th>Recommendation</th>
-                <th>Ask AI</th>
+                <th>Ask ACE</th>
               </tr>
             </thead>
             <tbody id="ev-tbody"></tbody>
@@ -592,11 +592,9 @@ geotab.addin["greenfleet-iq"] = () => {
               (stop.type==='night' ? '🌙 Night stop' : '⏱ Charging stop') +
               ': <strong>' + Math.round(stop.gapMin) + ' min</strong><br>' + timeStr;
             if (stop.type === 'charging') {
-              L.circleMarker([lat,lng],{radius:8,color:'#FFB900',fillColor:'#FFB900',fillOpacity:0.82,weight:2})
-               .bindPopup(popup).addTo(longStopLayer);
+              L.marker([lat,lng],{icon:L.divIcon({className:'',html:'<div style="width:26px;height:26px;background:#FFB900;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 20 20" width="13" height="13" fill="#fff"><path d="M11 2L4 11h6l-1 7 7-9h-6l1-7z"/></svg></div>',iconSize:[26,26],iconAnchor:[13,13],popupAnchor:[0,-14]})}).bindPopup(popup).addTo(longStopLayer);
             } else {
-              L.circleMarker([lat,lng],{radius:8,color:'#8764B8',fillColor:'#8764B8',fillOpacity:0.82,weight:2})
-               .bindPopup(popup).addTo(nightStopLayer);
+              L.marker([lat,lng],{icon:L.divIcon({className:'',html:'<div style="width:26px;height:26px;background:#8764B8;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 20 20" width="13" height="13" fill="#fff"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg></div>',iconSize:[26,26],iconAnchor:[13,13],popupAnchor:[0,-14]})}).bindPopup(popup).addTo(nightStopLayer);
             }
           }
         }
@@ -650,8 +648,7 @@ geotab.addin["greenfleet-iq"] = () => {
             (s.address ? s.address+'<br>' : '') +
             s.connectors+' connector'+(s.connectors!==1?'s':'')+
             (s.powerKW?' · '+s.powerKW+' kW':'');
-          L.circleMarker([s.lat,s.lng],{radius:7,color:'#107C10',fillColor:'#107C10',fillOpacity:0.82,weight:2})
-           .bindPopup(popup).addTo(evLayer);
+          L.marker([s.lat,s.lng],{icon:L.divIcon({className:'',html:'<div style="width:26px;height:26px;background:#107C10;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 20 20" width="13" height="13" fill="#fff"><path d="M7 2a1 1 0 00-1 1v1H5a1 1 0 000 2h1v2H5a1 1 0 000 2h1v1a3 3 0 002 2.83V16H7a1 1 0 000 2h6a1 1 0 000-2h-1v-1.17A3 3 0 0014 12V4a2 2 0 00-2-2H7zm5 2v8a1 1 0 01-1 1H9a1 1 0 01-1-1V4h4z"/></svg></div>',iconSize:[26,26],iconAnchor:[13,13],popupAnchor:[0,-14]})}).bindPopup(popup).addTo(evLayer);
           shown++;
         });
         if (shown===0) showMapBanner('⚡ No EV chargers in dataset near fleet area');

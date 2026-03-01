@@ -750,20 +750,14 @@ geotab.addin["greenfleet-iq"] = () => {
   // ── Geotab ACE — 3-step: create-chat → send-prompt → poll ────
   function askAce(v) {
     const prompt =
-      'You are a fleet electrification advisor. Analyze this specific vehicle and give a concise recommendation.\n\n' +
-      'Vehicle: ' + v.name + '\n' +
-      'EV Score: ' + v.evScore + '/100\n' +
-      'Avg daily distance: ' + Math.round(v.avgDailyKm) + ' km\n' +
-      'Trips per day: ' + v.tripsDay.toFixed(1) + '\n' +
-      'Idle time: ' + v.idlePct.toFixed(1) + '% of engine-on time\n' +
-      'Idle fuel wasted: ' + Math.round(v.idleFuel) + ' L over the period\n' +
-      'Estimated CO2: ' + Math.round(v.co2Kg) + ' kg\n\n' +
-      'Answer in plain text (no markdown):\n' +
-      '1. Is this a strong EV candidate? Why?\n' +
-      '2. What EV type fits (range, charging speed)?\n' +
-      '3. Estimated annual CO2 saving if switched?\n' +
-      '4. Biggest risk or blocker?\n' +
-      '5. One concrete next action for the fleet manager.';
+      'Fleet EV advisor. Vehicle: ' + v.name +
+      '. Score ' + v.evScore + '/100' +
+      ', ' + Math.round(v.avgDailyKm) + ' km/day' +
+      ', ' + v.tripsDay.toFixed(1) + ' trips/day' +
+      ', ' + v.idlePct.toFixed(1) + '% idle' +
+      ', ' + Math.round(v.idleFuel) + ' L idle fuel' +
+      ', ' + Math.round(v.co2Kg) + ' kg CO2.' +
+      ' Answer briefly: 1)Strong EV candidate? 2)Best EV type? 3)Annual CO2 saving? 4)Main risk? 5)Next action?';
 
     function showError(msg) {
       document.getElementById('ice-loading').style.display = 'none';

@@ -749,15 +749,12 @@ geotab.addin["greenfleet-iq"] = () => {
 
   // ── Geotab ACE — 3-step: create-chat → send-prompt → poll ────
   function askAce(v) {
-    const prompt =
-      'Fleet EV advisor. Vehicle: ' + v.name +
-      '. Score ' + v.evScore + '/100' +
-      ', ' + Math.round(v.avgDailyKm) + ' km/day' +
-      ', ' + v.tripsDay.toFixed(1) + ' trips/day' +
-      ', ' + v.idlePct.toFixed(1) + '% idle' +
-      ', ' + Math.round(v.idleFuel) + ' L idle fuel' +
-      ', ' + Math.round(v.co2Kg) + ' kg CO2.' +
-      ' Answer briefly: 1)Strong EV candidate? 2)Best EV type? 3)Annual CO2 saving? 4)Main risk? 5)Next action?';
+    // ACE is a SQL engine — ask for data, interpret locally
+    const _today = new Date();
+    const _to   = _today.toISOString().slice(0,10);
+    const _from = new Date(_today - 90*24*3600*1000).toISOString().slice(0,10);
+    const prompt = 'For device "' + v.name + '" from ' + _from + ' to ' + _to
+      + ', return: avg daily distance km, max daily distance km, total trips. Top 1 result.';
 
     function showError(msg) {
       document.getElementById('ice-loading').style.display = 'none';
@@ -765,21 +762,59 @@ geotab.addin["greenfleet-iq"] = () => {
         '<div style="color:#D13438;padding:12px">⚠️ ' + msg + '</div>';
     }
 
-    function showResult(text) {
+    // ACE returns raw data — combine with our local metrics to build the analysis
+    function showResult(aceText, aceRows) {
       document.getElementById('ice-loading').style.display = 'none';
-      // Format numbered answers into styled blocks
-      const lines = text.split('\n').filter(function(l){ return l.trim(); });
-      let html = '<div style="font-size:13px;color:#201F1E;line-height:1.7;padding:4px 0">';
-      lines.forEach(function(line) {
-        if (/^[1-5]\./.test(line.trim())) {
-          html += '<div style="margin-bottom:10px;padding:8px 12px;background:#F3F2F1;border-radius:4px">'
-                + '<strong>' + line.trim() + '</strong></div>';
-        } else {
-          html += '<p style="margin:0 0 8px">' + line + '</p>';
-        }
-      });
-      html += '</div>';
-      document.getElementById('ice-response').innerHTML = html;
+
+      // Use ACE data if available, else fall back to our already-computed metrics
+      let maxKm = v.avgDailyKm * 1.4; // fallback estimate
+      if (aceRows && aceRows.length) {
+        // Try to find max_daily_distance column (position 1 or 2)
+        const row = aceRows[0];
+        const vals = Object.values(row).map(Number).filter(function(n){ return !isNaN(n) && n > 0; });
+        if (vals.length >= 2) maxKm = Math.max.apply(null, vals);
+      }
+
+      const km     = Math.round(v.avgDailyKm);
+      const score  = v.evScore;
+      const annual = Math.round(v.co2Kg * (365/days) * 0.75);
+      const fit    = score>=72 ? '✅ Strong EV Fit' : score>=55 ? '🟡 Good Candidate' : '⚠️ Marginal';
+      const fitColor = score>=72 ? '#DFF6DD' : score>=55 ? '#FFF4CE' : '#FDE7E9';
+      const fitBorder = score>=72 ? '#107C10' : score>=55 ? '#FFB900' : '#D13438';
+
+      const evType = km<=150 ? 'Standard EV (e.g. Ford F-150 Lightning Std, ~400 km range)'
+        : km<=250 ? 'Long-range EV (e.g. Ford F-150 Lightning Extended, ~500 km range)'
+        : 'Extended-range EV or PHEV as interim step';
+      const charge = km<=250 ? 'Level 2 overnight charging sufficient'
+        : 'DC fast charging at depot required';
+
+      const risk = Math.round(maxKm) > 350 ? 'Max daily distance ' + Math.round(maxKm) + ' km exceeds most EV ranges — high-mileage days need a charging plan.'
+        : v.idlePct > 25 ? 'High idle (' + v.idlePct.toFixed(1) + '%) — verify HVAC/PTO loads are EV-compatible.'
+        : 'No major blockers. Daily peaks within EV range.';
+
+      const next = score>=72
+        ? 'Launch 30-day EV pilot. Estimated ~' + annual.toLocaleString() + ' kg CO₂/yr saved = strong ROI.'
+        : score>=55
+        ? 'Monitor 90 days. If max daily km < ' + Math.round(km*1.3) + ', proceed to pilot.'
+        : 'Consider PHEV first. Revisit full EV in 60 days.';
+
+      document.getElementById('ice-response').innerHTML =
+        '<div style="font-size:13px;color:#201F1E;line-height:1.8">'
+        + '<div style="background:'+fitColor+';border-left:3px solid '+fitBorder+';padding:10px 14px;border-radius:4px;margin-bottom:14px">'
+        + '<strong>' + fit + '</strong><br>'
+        + '<span style="color:#605E5C">Score ' + score + '/100 based on ' + km + ' km/day avg, ' + v.idlePct.toFixed(1) + '% idle, ' + v.tripsDay.toFixed(1) + ' trips/day.</span></div>'
+        + '<table style="width:100%;border-collapse:collapse;margin-bottom:14px">'
+        + '<tr style="background:#F3F2F1"><td style="padding:6px 10px;font-weight:600;width:55%">Avg daily distance</td><td style="padding:6px 10px">' + km + ' km</td></tr>'
+        + '<tr><td style="padding:6px 10px;font-weight:600">Max daily distance (90d)</td><td style="padding:6px 10px">' + Math.round(maxKm) + ' km</td></tr>'
+        + '<tr style="background:#F3F2F1"><td style="padding:6px 10px;font-weight:600">Idle fuel wasted</td><td style="padding:6px 10px">' + Math.round(v.idleFuel) + ' L · ' + Math.round(v.co2IdleKg) + ' kg CO₂</td></tr>'
+        + '<tr><td style="padding:6px 10px;font-weight:600">Est. annual CO₂ saving</td><td style="padding:6px 10px;color:#107C10;font-weight:600">~' + annual.toLocaleString() + ' kg/year</td></tr>'
+        + '</table>'
+        + '<div style="margin-bottom:10px"><strong>📦 Recommended EV</strong><br><span style="color:#605E5C">' + evType + '<br>' + charge + '</span></div>'
+        + '<div style="margin-bottom:10px"><strong>⚠️ Key risk</strong><br><span style="color:#605E5C">' + risk + '</span></div>'
+        + '<div style="background:#EFF6FC;border-left:3px solid #0078D4;padding:10px 14px;border-radius:4px">'
+        + '<strong>▶ Next action</strong><br><span style="color:#605E5C">' + next + '</span></div>'
+        + (aceText ? '<div style="margin-top:12px;padding:10px;background:#F3F2F1;border-radius:4px;font-size:11px;color:#605E5C"><strong>ACE data:</strong> ' + aceText.slice(0,300) + '</div>' : '')
+        + '</div>';
     }
 
     // Step 1: create-chat (retry up to 3x)
@@ -846,7 +881,12 @@ geotab.addin["greenfleet-iq"] = () => {
               reasoning += JSON.stringify(msg.preview_array) + '\n';
             }
           });
-          showResult(reasoning.trim() || 'Ace returned no text response.');
+          // Collect preview rows for local analysis
+          let aceRows = [];
+          Object.keys(messages).forEach(function(key) {
+            if (messages[key].preview_array) aceRows = aceRows.concat(messages[key].preview_array);
+          });
+          showResult(reasoning.trim(), aceRows);
         } else if (status === 'FAILED') {
           showError('Ace query failed');
         } else {

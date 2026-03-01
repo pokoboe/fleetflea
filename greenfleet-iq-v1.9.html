@@ -114,7 +114,7 @@
                 <th>Fuel wasted</th>
                 <th>CO₂ wasted</th>
                 <th>Status</th>
-                <th>📊</th>
+                <th>Details chart</th>
               </tr>
             </thead>
             <tbody id="idle-tbody"></tbody>
@@ -448,7 +448,7 @@ geotab.addin["greenfleet-iq"] = () => {
         <td>${fmt(v.idleFuel,0)} L</td>
         <td>${fmt(v.co2IdleKg,0)} kg</td>
         <td><span class="pill ${cls}">${txt}</span></td>
-        <td><button class="detail-btn" data-id="${v.id}">📊</button></td>
+        <td><button class="detail-btn" data-id="${v.id}" title="View daily trend chart"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="10" width="3" height="8" rx="1" fill="currentColor"/><rect x="8.5" y="5" width="3" height="13" rx="1" fill="currentColor"/><rect x="15" y="1" width="3" height="17" rx="1" fill="currentColor"/></svg></button></td>
       </tr>`;
     }).join("");
 
@@ -464,7 +464,7 @@ geotab.addin["greenfleet-iq"] = () => {
         <td>${v.harshPenaltyPct > 0.1 ? fmt(v.harshPenaltyPct,1) + "%" : "—"}</td>
         <td>${progressBar(v.evScore, color)}</td>
         <td><span class="pill ${cls}">${txt}</span></td>
-        <td><button class="ask-ice-btn" data-ev-id="${v.id}">🤖 Ask AI</button></td>
+        <td><button class="ask-ice-btn" data-ev-id="${v.id}" style="display:inline-flex;align-items:center;gap:5px"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a.75.75 0 01.728.572l.068.303A5.25 5.25 0 0014.125 6.1l.303.068a.75.75 0 010 1.456l-.303.068A5.25 5.25 0 0010.796 11l-.068.303a.75.75 0 01-1.456 0L9.204 11A5.25 5.25 0 005.875 7.692l-.303-.068a.75.75 0 010-1.456l.303-.068A5.25 5.25 0 009.204 2.875L9.272 2.572A.75.75 0 0110 2zm6.5 9a.5.5 0 01.485.379l.045.2a3.5 3.5 0 002.391 2.391l.2.045a.5.5 0 010 .97l-.2.045a3.5 3.5 0 00-2.391 2.391l-.045.2a.5.5 0 01-.97 0l-.045-.2a3.5 3.5 0 00-2.391-2.391l-.2-.045a.5.5 0 010-.97l.2-.045a3.5 3.5 0 002.391-2.391l.045-.2A.5.5 0 0116.5 11z" fill="currentColor"/></svg> Ask AI</button></td>
       </tr>`;
     }).join("");
 

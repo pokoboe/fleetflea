@@ -464,7 +464,7 @@ geotab.addin["greenfleet-iq"] = () => {
         <td>${v.harshPenaltyPct > 0.1 ? fmt(v.harshPenaltyPct,1) + "%" : "—"}</td>
         <td>${progressBar(v.evScore, color)}</td>
         <td><span class="pill ${cls}">${txt}</span></td>
-        <td><button class="ask-ice-btn" data-ev-id="${v.id}">Ask ACE</button></td>
+        <td><button class="ask-ice-btn" data-ev-id="${v.id}">🤖 Ask AI</button></td>
       </tr>`;
     }).join("");
 
@@ -737,11 +737,9 @@ geotab.addin["greenfleet-iq"] = () => {
           'Score ' + v.evScore + '/100 · ' + Math.round(v.avgDailyKm) + ' km/day · ' + v.idlePct.toFixed(1) + '% idle';
         document.getElementById('ice-response').innerHTML = '';
         document.getElementById('ice-loading').style.display = 'flex';
+        document.getElementById('ice-loading').querySelector('span').textContent = 'Asking Geotab AI... (30–60 sec)';
         document.getElementById('ice-modal').style.display = 'flex';
-        setTimeout(function() {
-          document.getElementById('ice-loading').style.display = 'none';
-          document.getElementById('ice-response').innerHTML = generateEVAnalysis(v);
-        }, 400);
+        askAce(v);
       };
     });
     document.getElementById('ice-modal-close').onclick = function() {
@@ -749,37 +747,125 @@ geotab.addin["greenfleet-iq"] = () => {
     };
   }
 
-  function generateEVAnalysis(v) {
-    const km = Math.round(v.avgDailyKm), score = v.evScore;
-    const annual = Math.round(v.co2Kg * (365/days) * 0.75);
-    const evType = km<=150 ? 'Standard EV (~400 km range, e.g. F-150 Lightning Std)'
-      : km<=250 ? 'Long-range EV (~500 km, e.g. F-150 Lightning Extended)'
-      : 'Extended-range EV or PHEV as interim step';
-    const charge = km<=150 ? 'Level 2 overnight charging sufficient'
-      : km<=250 ? 'Level 2 overnight + DC fast charge on peak days'
-      : 'DC fast charging at depot required';
-    const fit = score>=72 ? '✅ Strong EV Fit' : score>=55 ? '🟡 Good Candidate' : '⚠️ Marginal';
-    const why = score>=72 ? 'Daily range fits EV well. High idle % means full savings from electrification.'
-      : score>=55 ? 'Range fits most EVs. Monitor peak-day distances.'
-      : 'Range near EV limits — consider 20% buffer.';
-    const risk = km>280 ? 'Range risk on high-mileage days ('+km+' km avg). Log peaks before deciding.'
-      : v.idlePct>25 ? 'High idle ('+v.idlePct.toFixed(1)+'%) — verify HVAC/PTO loads are EV-compatible.'
-      : 'No major blockers identified.';
-    const next = score>=72 ? 'Start 30-day EV pilot — use ~'+annual.toLocaleString()+' kg CO₂/yr saved as ROI.'
-      : score>=55 ? 'Pull 90-day history. If max daily km < '+Math.round(km*1.3)+', proceed to pilot.'
-      : 'Monitor 60 more days or consider PHEV first.';
-    return '<div style="font-size:13px;color:#201F1E;line-height:1.8">'
-      +'<div style="background:#DFF6DD;border-left:3px solid #107C10;padding:10px 14px;border-radius:4px;margin-bottom:14px"><strong>'+fit+'</strong><br><span style="color:#605E5C">'+why+'</span></div>'
-      +'<table style="width:100%;border-collapse:collapse;margin-bottom:14px">'
-      +'<tr style="background:#F3F2F1"><td style="padding:6px 10px;font-weight:600;width:50%">EV Score</td><td style="padding:6px 10px">'+score+' / 100</td></tr>'
-      +'<tr><td style="padding:6px 10px;font-weight:600">Daily distance</td><td style="padding:6px 10px">'+km+' km/day · '+v.tripsDay.toFixed(1)+' trips</td></tr>'
-      +'<tr style="background:#F3F2F1"><td style="padding:6px 10px;font-weight:600">Idle waste</td><td style="padding:6px 10px">'+v.idlePct.toFixed(1)+'% · '+Math.round(v.idleFuel)+' L</td></tr>'
-      +'<tr><td style="padding:6px 10px;font-weight:600">Annual CO₂ saving (est.)</td><td style="padding:6px 10px;color:#107C10;font-weight:600">~'+annual.toLocaleString()+' kg/year</td></tr>'
-      +'</table>'
-      +'<div style="margin-bottom:10px"><strong>📦 Recommended EV</strong><br><span style="color:#605E5C">'+evType+'<br>'+charge+'</span></div>'
-      +'<div style="margin-bottom:10px"><strong>⚠️ Key risk</strong><br><span style="color:#605E5C">'+risk+'</span></div>'
-      +'<div style="background:#EFF6FC;border-left:3px solid #0078D4;padding:10px 14px;border-radius:4px"><strong>▶ Next action</strong><br><span style="color:#605E5C">'+next+'</span></div>'
-      +'</div>';
+  // ── Geotab ACE — 3-step: create-chat → send-prompt → poll ────
+  function askAce(v) {
+    const prompt =
+      'You are a fleet electrification advisor. Analyze this specific vehicle and give a concise recommendation.\n\n' +
+      'Vehicle: ' + v.name + '\n' +
+      'EV Score: ' + v.evScore + '/100\n' +
+      'Avg daily distance: ' + Math.round(v.avgDailyKm) + ' km\n' +
+      'Trips per day: ' + v.tripsDay.toFixed(1) + '\n' +
+      'Idle time: ' + v.idlePct.toFixed(1) + '% of engine-on time\n' +
+      'Idle fuel wasted: ' + Math.round(v.idleFuel) + ' L over the period\n' +
+      'Estimated CO2: ' + Math.round(v.co2Kg) + ' kg\n\n' +
+      'Answer in plain text (no markdown):\n' +
+      '1. Is this a strong EV candidate? Why?\n' +
+      '2. What EV type fits (range, charging speed)?\n' +
+      '3. Estimated annual CO2 saving if switched?\n' +
+      '4. Biggest risk or blocker?\n' +
+      '5. One concrete next action for the fleet manager.';
+
+    function showError(msg) {
+      document.getElementById('ice-loading').style.display = 'none';
+      document.getElementById('ice-response').innerHTML =
+        '<div style="color:#D13438;padding:12px">⚠️ ' + msg + '</div>';
+    }
+
+    function showResult(text) {
+      document.getElementById('ice-loading').style.display = 'none';
+      // Format numbered answers into styled blocks
+      const lines = text.split('\n').filter(function(l){ return l.trim(); });
+      let html = '<div style="font-size:13px;color:#201F1E;line-height:1.7;padding:4px 0">';
+      lines.forEach(function(line) {
+        if (/^[1-5]\./.test(line.trim())) {
+          html += '<div style="margin-bottom:10px;padding:8px 12px;background:#F3F2F1;border-radius:4px">'
+                + '<strong>' + line.trim() + '</strong></div>';
+        } else {
+          html += '<p style="margin:0 0 8px">' + line + '</p>';
+        }
+      });
+      html += '</div>';
+      document.getElementById('ice-response').innerHTML = html;
+    }
+
+    // Step 1: create-chat (retry up to 3x)
+    let attempts = 0;
+    function createChat() {
+      attempts++;
+      api.call('GetAceResults', {
+        serviceName: 'dna-planet-orchestration',
+        functionName: 'create-chat',
+        customerData: true,
+        functionParameters: {}
+      }, function(res) {
+        const data = res && res.apiResult && res.apiResult.results && res.apiResult.results[0];
+        const chatId = data && data.chat_id;
+        if (!chatId) {
+          if (attempts < 3) { setTimeout(createChat, 3000); }
+          else { showError('Ace not available — enable it in Administration > Beta Features'); }
+          return;
+        }
+        sendPrompt(chatId);
+      }, function(err) {
+        if (attempts < 3) { setTimeout(createChat, 3000); }
+        else { showError('Ace error: ' + err); }
+      });
+    }
+
+    // Step 2: send-prompt
+    function sendPrompt(chatId) {
+      api.call('GetAceResults', {
+        serviceName: 'dna-planet-orchestration',
+        functionName: 'send-prompt',
+        customerData: true,
+        functionParameters: { chat_id: chatId, prompt: prompt }
+      }, function(res) {
+        const data = res && res.apiResult && res.apiResult.results && res.apiResult.results[0];
+        const mgId = data && (data.message_group_id || (data.message_group && data.message_group.id));
+        if (!mgId) { showError('No message_group_id from Ace'); return; }
+        // Step 3: poll after 8 sec (Ace minimum)
+        setTimeout(function() { pollAce(chatId, mgId, 0); }, 8000);
+      }, function(err) { showError('send-prompt failed: ' + err); });
+    }
+
+    // Step 3: poll until DONE
+    function pollAce(chatId, mgId, attempt) {
+      if (attempt > 30) { showError('Ace timed out — try again'); return; }
+      api.call('GetAceResults', {
+        serviceName: 'dna-planet-orchestration',
+        functionName: 'get-message-group',
+        customerData: true,
+        functionParameters: { chat_id: chatId, message_group_id: mgId }
+      }, function(res) {
+        const data = res && res.apiResult && res.apiResult.results && res.apiResult.results[0];
+        const mg   = data && data.message_group;
+        const status = mg && mg.status && mg.status.status;
+
+        if (status === 'DONE') {
+          // Extract reasoning text from messages
+          const messages = mg.messages || {};
+          let reasoning = '';
+          Object.keys(messages).forEach(function(key) {
+            const msg = messages[key];
+            if (msg.reasoning) reasoning += msg.reasoning + '\n';
+            else if (msg.preview_array && msg.preview_array.length) {
+              reasoning += JSON.stringify(msg.preview_array) + '\n';
+            }
+          });
+          showResult(reasoning.trim() || 'Ace returned no text response.');
+        } else if (status === 'FAILED') {
+          showError('Ace query failed');
+        } else {
+          // Still processing — update counter, poll again in 5 sec
+          const elapsed = 8 + attempt * 5;
+          document.getElementById('ice-loading').querySelector('span').textContent =
+            'Geotab AI thinking... ' + elapsed + 's';
+          setTimeout(function() { pollAce(chatId, mgId, attempt + 1); }, 5000);
+        }
+      }, function(err) { showError('poll failed: ' + err); });
+    }
+
+    createChat();
   }
 
   // Tab switching

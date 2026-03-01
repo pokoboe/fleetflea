@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>GreenFleet IQ • FleetFlea</title>
-  <link rel="stylesheet" href="greenfleet-iq.css">
+  <title>GreenFleet</title>
+  <link rel="stylesheet" href="greenfleet.css">
   <script src="lib/chart.umd.min.js"></script>
   <link rel="stylesheet" href="lib/leaflet.css" />
   <script src="lib/leaflet.js"></script>
@@ -44,24 +44,24 @@
   <!-- Tab Navigation -->
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="dashboard">📊 Idle & EV Analysis</button>
-    <button class="tab-btn" data-tab="map">⚡ EV Charging Readiness</button>
+    <button class="tab-btn" data-tab="map">⚡MAP EV Charging Readiness</button>
   </div>
 
   <!-- DASHBOARD TAB -->
   <div id="dashboard" class="tab-content">
     <div class="page-header">
       <div>
-        <div class="page-title">🌿 GreenFleet IQ</div>
-        <div class="page-subtitle" id="page-subtitle">Fuel waste · Idle inefficiency · EV readiness · Last 30 days</div>
+        <div class="page-title">GreenFleet</div>
+        <div class="page-subtitle" id="page-subtitle">Fuel waste · Idle inefficiency · MAP EV readiness · Last 30 days</div>
       </div>
       <div class="header-right">
         <select id="range-select">
           <option value="1">Last day</option>
-          <option value="5">Last 5 days</option>
+          <option value="7">Last 7 days</option>
           <option value="30" selected>Last 30 days</option>
         </select>
         <span class="db-label" id="db-label">Loading...</span>
-        <span class="version-label">v1.9 · FleetFlea</span>
+        <span class="version-label">v2.0.26 · FleetFlea</span>
       </div>
     </div>
 
@@ -148,7 +148,7 @@
       </div>
 
       <div class="footer">
-        GreenFleet IQ v1.9 • FleetFlea • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
+        GreenFleet v2.0.26 • Data: MyGeotab Trip + ExceptionEvent • Feb 2026
       </div>
 
     </div>
